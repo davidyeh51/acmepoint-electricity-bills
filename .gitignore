@@ -1,0 +1,22 @@
+# Confidential customer, strategy and internal LINE logs
+[LINE]*
+*.txt
+AIAGENT-MASTER*
+pv-ai-agent-platform/
+
+# Python & Environment
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+*.env.*
+venv/
+.venv/
+
+# Temporary and log files
+*.log
+*.tmp
+test_ocr_dump.json
+test_export.xlsx
+.system_generated/
+

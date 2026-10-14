@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>進金生能源 - 客戶太陽能電費單管理系統</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        },
+                        solar: {
+                            500: '#f59e0b',
+                            600: '#d97706',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-700 to-solar-500 flex items-center justify-center text-white shadow-md">
+                    <i data-lucide="zap" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-extrabold text-lg text-slate-900 tracking-tight">進金生能源</span>
+                        <span class="text-xs px-2 py-0.5 rounded-full font-semibold bg-brand-100 text-brand-800 border border-brand-200">AI 運維管理</span>
+                    </div>
+                    <p class="text-xs text-slate-500 font-medium">客戶太陽能躉購電費單智能辨識與資料庫系統</p>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center space-x-2.5">
+                <button onclick="triggerSyncFolder()" id="syncBtn" class="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-brand-600 transition shadow-sm">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="syncIcon"></i>
+                    <span>同步資料夾</span>
+                </button>
+                <button onclick="openDispatchModal()" class="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition shadow-sm">
+                    <i data-lucide="clipboard-list" class="w-3.5 h-3.5"></i>
+                    <span>匯入派送清冊</span>
+                </button>
+                <button onclick="exportExcel()" class="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition shadow-sm">
+                    <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
+                    <span>匯出 Excel</span>
+                </button>
+                <button onclick="openUploadModal()" class="inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition shadow-md hover:shadow-lg">
+                    <i data-lucide="upload-cloud" class="w-3.5 h-3.5"></i>
+                    <span>上傳電費單</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- KPI Dashboard Cards -->
+        <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4" id="kpiContainer">
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+                <div class="flex items-center justify-between text-slate-500 mb-1">
+                    <span class="text-xs font-semibold uppercase tracking-wider">納管案場數</span>
+                    <i data-lucide="sun" class="w-4 h-4 text-solar-500"></i>
+                </div>
+                <div class="text-2xl font-bold text-slate-900" id="kpiPlantCount">-</div>
+                <div class="text-xs text-slate-400 mt-1">獨立電號案場</div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+                <div class="flex items-center justify-between text-slate-500 mb-1">
+                    <span class="text-xs font-semibold uppercase tracking-wider">電費單總數</span>
+                    <i data-lucide="file-text" class="w-4 h-4 text-brand-500"></i>
+                </div>
+                <div class="text-2xl font-bold text-slate-900" id="kpiBillCount">-</div>
+                <div class="text-xs text-slate-400 mt-1">已建檔辨識帳單</div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+                <div class="flex items-center justify-between text-slate-500 mb-1">
+                    <span class="text-xs font-semibold uppercase tracking-wider">總購電度數</span>
+                    <i data-lucide="activity" class="w-4 h-4 text-emerald-500"></i>
+                </div>
+                <div class="text-2xl font-bold text-slate-900" id="kpiSumKwh">-</div>
+                <div class="text-xs text-slate-400 mt-1">累計發電 kWh</div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+                <div class="flex items-center justify-between text-slate-500 mb-1">
+                    <span class="text-xs font-semibold uppercase tracking-wider">總購電金額</span>
+                    <i data-lucide="coins" class="w-4 h-4 text-amber-500"></i>
+                </div>
+                <div class="text-2xl font-bold text-slate-900" id="kpiSumPurchase">-</div>
+                <div class="text-xs text-slate-400 mt-1">未稅躉售總額</div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+                <div class="flex items-center justify-between text-slate-500 mb-1">
+                    <span class="text-xs font-semibold uppercase tracking-wider">應付總金額</span>
+                    <i data-lucide="dollar-sign" class="w-4 h-4 text-indigo-500"></i>
+                </div>
+                <div class="text-2xl font-bold text-slate-900" id="kpiSumPayable">-</div>
+                <div class="text-xs text-slate-400 mt-1">含稅實收電費</div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+                <div class="flex items-center justify-between text-slate-500 mb-1">
+                    <span class="text-xs font-semibold uppercase tracking-wider">平均躉購費率</span>
+                    <i data-lucide="trending-up" class="w-4 h-4 text-teal-500"></i>
+                </div>
+                <div class="text-2xl font-bold text-slate-900" id="kpiAvgRate">-</div>
+                <div class="text-xs text-slate-400 mt-1">元 / 度 (FiT)</div>
+            </div>
+        </section>
+
+        <!-- Search & Filter Controls -->
+        <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex flex-col md:flex-row gap-3">
+                <!-- Search Box -->
+                <div class="flex-1 relative">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <i data-lucide="search" class="w-5 h-5"></i>
+                    </div>
+                    <input 
+                        type="text" 
+                        id="searchInput"
+                        oninput="debounceSearch()"
+                        placeholder="搜尋電號、契約編號、案場名稱/地點、客戶名稱、統一編號或全文關鍵字..."
+                        class="w-full pl-10 pr-10 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition"
+                    >
+                    <button 
+                        onclick="clearSearch()" 
+                        id="clearSearchBtn"
+                        class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 hidden"
+                    >
+                        <i data-lucide="x-circle" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Filters -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <select id="filterCustomer" onchange="fetchBills()" class="py-2.5 px-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        <option value="">所有客戶</option>
+                    </select>
+
+                    <select id="filterMonth" onchange="fetchBills()" class="py-2.5 px-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        <option value="">所有帳單期別</option>
+                    </select>
+
+                    <select id="filterCity" onchange="fetchBills()" class="py-2.5 px-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        <option value="">所有縣市</option>
+                    </select>
+
+                    <select id="sortSelect" onchange="fetchBills()" class="py-2.5 px-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        <option value="id_desc">最新建立優先</option>
+                        <option value="month_desc">帳單期別 (新至舊)</option>
+                        <option value="amount_desc">應付金額 (高至低)</option>
+                        <option value="kwh_desc">發電度數 (高至低)</option>
+                        <option value="capacity_desc">裝置容量 (大至小)</option>
+                    </select>
+
+                    <button onclick="resetFilters()" class="py-2.5 px-3 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded-xl hover:bg-slate-100 transition" title="重設條件">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Active search status info -->
+            <div class="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-100">
+                <span id="resultsCount">載入中...</span>
+                <span class="flex items-center space-x-1.5 text-slate-400">
+                    <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                    <span>點擊「下載」可直接儲存 PDF 原檔；點擊「預覽」可在瀏覽器內開啟對帳</span>
+                </span>
+            </div>
+        </section>
+
+        <!-- Bills Data Table -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                            <th class="py-3.5 px-4">帳單期別 / 期間</th>
+                            <th class="py-3.5 px-4">案場名稱 / 電號</th>
+                            <th class="py-3.5 px-4">客戶名稱 / 統編</th>
+                            <th class="py-3.5 px-4">設置地點</th>
+                            <th class="py-3.5 px-4 text-right">容量 (kW)</th>
+                            <th class="py-3.5 px-4 text-right">購電度數 (kWh)</th>
+                            <th class="py-3.5 px-4 text-right">費率 (元)</th>
+                            <th class="py-3.5 px-4 text-right">應付總金額 (NT$)</th>
+                            <th class="py-3.5 px-4 text-center">電費單操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="billsTableBody" class="divide-y divide-slate-100 text-sm">
+                        <!-- Dynamic bill rows will be rendered here -->
+                        <tr>
+                            <td colspan="9" class="py-12 text-center text-slate-400">
+                                <div class="inline-block animate-spin mb-2">
+                                    <i data-lucide="loader" class="w-6 h-6 text-brand-600"></i>
+                                </div>
+                                <p>正在載入電費單資料庫...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Upload Modal -->
+    <div id="uploadModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm hidden">
+        <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-slate-100 overflow-hidden transform transition-all">
+            <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center font-bold">
+                        <i data-lucide="upload-cloud" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-base">上傳電費單 PDF</h3>
+                        <p class="text-xs text-slate-500">系統將自動進行 OCR 智慧辨識、提取數據並寫入資料庫</p>
+                    </div>
+                </div>
+                <button onclick="closeUploadModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <!-- Drop Zone -->
+                <div 
+                    id="dropZone"
+                    ondragover="handleDragOver(event)"
+                    ondragleave="handleDragLeave(event)"
+                    ondrop="handleDrop(event)"
+                    onclick="document.getElementById('fileInput').click()"
+                    class="border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-2xl p-8 text-center cursor-pointer transition bg-slate-50 hover:bg-brand-50/30 group"
+                >
+                    <input type="file" id="fileInput" multiple accept=".pdf" onchange="handleFileSelect(event)" class="hidden">
+                    <div class="w-12 h-12 mx-auto rounded-full bg-brand-100 text-brand-600 flex items-center justify-center mb-3 group-hover:scale-110 transition">
+                        <i data-lucide="file-up" class="w-6 h-6"></i>
+                    </div>
+                    <p class="text-sm font-semibold text-slate-800">點擊選擇檔案 或 將 PDF 拖曳至此處</p>
+                    <p class="text-xs text-slate-400 mt-1">支援台電再生能源躉購電費通知單 (支援單檔或多檔批次上傳)</p>
+                </div>
+
+                <!-- Selected Files List -->
+                <div id="uploadFileList" class="space-y-2 max-h-48 overflow-y-auto hidden"></div>
+
+                <!-- Upload Progress & Status -->
+                <div id="uploadStatusBox" class="hidden p-3 rounded-xl bg-brand-50 border border-brand-200 text-xs text-brand-900 flex items-center space-x-2">
+                    <div class="animate-spin text-brand-600"><i data-lucide="loader-2" class="w-4 h-4"></i></div>
+                    <span id="uploadStatusText">正在上傳並執行 AI 辨識...</span>
+                </div>
+            </div>
+
+            <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end space-x-3">
+                <button onclick="closeUploadModal()" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 font-medium rounded-lg">取消</button>
+                <button onclick="submitUpload()" id="startUploadBtn" class="px-5 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-md disabled:opacity-50" disabled>開始辨識入庫</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dispatch Import Modal -->
+    <div id="dispatchModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm hidden">
+        <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-slate-100 overflow-hidden transform transition-all">
+            <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                        <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-base">匯入本日派送電費單清冊</h3>
+                        <p class="text-xs text-slate-500">直接貼上派送通知（含電號、案場名稱），系統自動關聯電費單</p>
+                    </div>
+                </div>
+                <button onclick="closeDispatchModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">派送清冊文字 (支援直接複製整段 Email 或表格文字貼上)</label>
+                    <textarea 
+                        id="dispatchTextInput"
+                        rows="7"
+                        placeholder="電號	案場名稱	計費期間(起)	計費期間(迄)	電費單&#10;08-40-8620-12-7	美傢家具鹿港廠1	20260901	20260930	08-40-8620-12-7_211307_1.pdf&#10;10-56-4770-02-1	賴侯淑貞	20260904	20261005	10-56-4770-02-1_211458_1.pdf"
+                        class="w-full text-xs font-mono p-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    ></textarea>
+                    <p class="text-[11px] text-slate-400 mt-1">💡 系統會以「電號」或「電費單檔名」自動比對現有電費單，並將「案場名稱」寫入資料庫及永久記憶對照表。</p>
+                </div>
+            </div>
+
+            <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end space-x-3">
+                <button onclick="closeDispatchModal()" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 font-medium rounded-lg">取消</button>
+                <button onclick="submitDispatchImport()" id="submitDispatchBtn" class="px-5 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow-md">立即解析並更新案場</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bill Details & Preview Modal -->
+    <div id="previewModal" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-sm hidden">
+        <div class="bg-white rounded-2xl w-full max-w-6xl h-[92vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold">
+                        <i data-lucide="file-check" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <h3 class="font-bold text-slate-900 text-base" id="modalBillTitle">電費單明細與預覽</h3>
+                            <span id="modalBillBadge" class="text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">AI 辨識成功</span>
+                        </div>
+                        <p class="text-xs text-slate-500" id="modalBillSubtitle">電號: - | 契約編號: -</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <a id="modalDownloadBtn" href="#" target="_blank" download class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        <span>下載電費單</span>
+                    </a>
+                    <button onclick="toggleEditMode()" id="editToggleBtn" class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition">
+                        <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                        <span id="editBtnText">編輯欄位</span>
+                    </button>
+                    <button onclick="closePreviewModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Body (Split: PDF Preview on Left, Extracted Database Fields on Right) -->
+            <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+                <!-- Left: PDF Viewer -->
+                <div class="w-full md:w-1/2 bg-slate-100 border-r border-slate-200 flex flex-col">
+                    <div class="py-2 px-4 bg-slate-200/70 border-b border-slate-300 flex items-center justify-between text-xs text-slate-600 font-medium">
+                        <span class="flex items-center space-x-1.5">
+                            <i data-lucide="file" class="w-3.5 h-3.5"></i>
+                            <span id="modalPdfFilename">原始電費單 PDF 檢視</span>
+                        </span>
+                        <a id="modalOpenExternalBtn" href="#" target="_blank" class="hover:text-brand-600 inline-flex items-center space-x-1">
+                            <span>在新分頁開啟</span>
+                            <i data-lucide="external-link" class="w-3 h-3"></i>
+                        </a>
+                    </div>
+                    <iframe id="pdfIframe" src="" class="w-full flex-1 border-0 bg-white"></iframe>
+                </div>
+
+                <!-- Right: Database Fields & Machine Details -->
+                <div class="w-full md:w-1/2 overflow-y-auto p-6 space-y-6 bg-white">
+                    
+                    <!-- Basic Information Card -->
+                    <div class="space-y-3">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
+                            <i data-lucide="info" class="w-4 h-4 text-brand-600"></i>
+                            <span>基本資料與案場資訊</span>
+                        </h4>
+                        <div class="grid grid-cols-2 gap-3 text-xs">
+                            <div class="bg-amber-50/80 p-2.5 rounded-xl border border-amber-200 col-span-2">
+                                <span class="text-amber-800 font-bold block mb-0.5">案場名稱</span>
+                                <input type="text" id="fieldSiteName" class="w-full font-bold text-amber-950 bg-transparent border-0 p-0 focus:ring-0 text-sm" placeholder="例如：美傢家具鹿港廠1" readonly>
+                            </div>
+                            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <span class="text-slate-400 block mb-0.5">電號</span>
+                                <input type="text" id="fieldElectricNo" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
+                            </div>
+                            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <span class="text-slate-400 block mb-0.5">契約編號</span>
+                                <input type="text" id="fieldContractNo" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
+                            </div>
+                            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <span class="text-slate-400 block mb-0.5">用戶名稱</span>
+                                <input type="text" id="fieldCustomerName" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
+                            </div>
+                            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <span class="text-slate-400 block mb-0.5">統一編號</span>
+                                <input type="text" id="fieldTaxId" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
+                            </div>
+                            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 col-span-2">
+                                <span class="text-slate-400 block mb-0.5">案場設置地點</span>
+                                <input type="text" id="fieldLocation" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
+                            </div>
+                            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <span class="text-slate-400 block mb-0.5">帳單年月</span>
+                                <input type="text" id="fieldBillMonth" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
+                            </div>
+                            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <span class="text-slate-400 block mb-0.5">計費期間</span>
+                                <input type="text" id="fieldBillingPeriod" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Financial & Tariff Breakdown Card -->
+                    <div class="space-y-3">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
+                            <i data-lucide="dollar-sign" class="w-4 h-4 text-emerald-600"></i>
+                            <span>電費與度數計算</span>
+                        </h4>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <span class="text-slate-400 block mb-0.5">裝置容量 (kW)</span>
+                                <input type="number" step="0.0001" id="fieldCapacity" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
+                            </div>
+                            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <span class="text-slate-400 block mb-0.5">購電度數 (kWh)</span>
+                                <input type="number" id="fieldKwh" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
+                            </div>
+                            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <span class="text-slate-400 block mb-0.5">躉購費率 (元/度)</span>
+                                <input type="number" step="0.0001" id="fieldRate" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
+                            </div>
+                            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <span class="text-slate-400 block mb-0.5">購電電費 (未稅)</span>
+                                <input type="number" id="fieldPurchaseAmount" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
+                            </div>
+                            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <span class="text-slate-400 block mb-0.5">營業稅 5%</span>
+                                <input type="number" id="fieldTaxAmount" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
+                            </div>
+                            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <span class="text-slate-400 block mb-0.5">電表租費扣項</span>
+                                <input type="number" id="fieldMeterRental" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
+                            </div>
+                            <div class="bg-brand-50 p-3 rounded-xl border border-brand-200 col-span-2 sm:col-span-3 flex items-center justify-between">
+                                <div>
+                                    <span class="text-xs font-bold text-brand-900 block">本期應付總金額 (Net Payable)</span>
+                                    <span class="text-xs text-brand-700">含稅電費合計扣除電表租費後之撥款金額</span>
+                                </div>
+                                <div class="text-xl font-black text-brand-900">
+                                    NT$ <input type="number" id="fieldPayableAmount" class="w-32 inline text-right font-black text-brand-900 bg-transparent border-0 p-0 focus:ring-0" readonly>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Machine Units Table -->
+                    <div class="space-y-2">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
+                            <i data-lucide="cpu" class="w-4 h-4 text-solar-500"></i>
+                            <span>各機組發電與費率拆解</span>
+                        </h4>
+                        <div class="border border-slate-200 rounded-xl overflow-hidden">
+                            <table class="w-full text-xs text-left">
+                                <thead class="bg-slate-50 border-b border-slate-200 text-slate-500">
+                                    <tr>
+                                        <th class="p-2.5">機組名稱</th>
+                                        <th class="p-2.5 text-right">費率 (元/度)</th>
+                                        <th class="p-2.5 text-right">度數 (kWh)</th>
+                                        <th class="p-2.5 text-right">購電金額 (元)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="modalMachinesBody" class="divide-y divide-slate-100">
+                                    <!-- Dynamic machine rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Additional Details (Bank, Branch, Meter Dates) -->
+                    <div class="space-y-3">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
+                            <i data-lucide="building-2" class="w-4 h-4 text-indigo-500"></i>
+                            <span>撥款帳戶與台電抄表</span>
+                        </h4>
+                        <div class="grid grid-cols-2 gap-3 text-xs">
+                            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 col-span-2">
+                                <span class="text-slate-400 block mb-0.5">台電匯款帳戶</span>
+                                <input type="text" id="fieldPaymentAccount" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
+                            </div>
+                            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <span class="text-slate-400 block mb-0.5">台電服務營業處</span>
+                                <input type="text" id="fieldTaipowerBranch" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
+                            </div>
+                            <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                <span class="text-slate-400 block mb-0.5">本次抄表日</span>
+                                <input type="text" id="fieldMeterReadCurr" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Save Edit Changes Action -->
+                    <div id="saveEditActionRow" class="hidden pt-3 border-t border-slate-200 flex items-center justify-end space-x-3">
+                        <button onclick="cancelEditMode()" class="px-3.5 py-1.5 text-xs text-slate-600 font-semibold hover:bg-slate-100 rounded-lg">取消</button>
+                        <button onclick="saveBillEdits()" class="px-4 py-1.5 text-xs text-white font-semibold bg-brand-600 hover:bg-brand-700 rounded-lg shadow">儲存修改</button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 flex items-center space-x-2 px-4 py-3 rounded-xl shadow-xl bg-slate-900 text-white text-sm transform transition-all translate-y-16 opacity-0 pointer-events-none">
+        <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400" id="toastIcon"></i>
+        <span id="toastMsg">通知訊息</span>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        let currentBills = [];
+        let activeBillId = null;
+        let isEditMode = false;
+        let selectedUploadFiles = [];
+        let searchTimeout = null;
+
+        // Initialize icons and data
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            fetchKPIs();
+            fetchFilters();
+            fetchBills();
+        });
+
+        // Toast feedback
+        function showToast(msg, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+            
+            toastMsg.innerText = msg;
+            toast.className = `fixed bottom-5 right-5 z-50 flex items-center space-x-2 px-4 py-3 rounded-xl shadow-xl ${isError ? 'bg-rose-900' : 'bg-slate-900'} text-white text-sm transform transition-all duration-300 translate-y-0 opacity-100 pointer-events-auto`;
+            toastIcon.setAttribute('data-lucide', isError ? 'alert-triangle' : 'check-circle');
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.className = 'fixed bottom-5 right-5 z-50 flex items-center space-x-2 px-4 py-3 rounded-xl shadow-xl bg-slate-900 text-white text-sm transform transition-all duration-300 translate-y-16 opacity-0 pointer-events-none';
+            }, 3500);
+        }
+
+        // Fetch KPIs
+        async function fetchKPIs() {
+            try {
+                const res = await fetch('/api/kpi');
+                const data = await res.json();
+                document.getElementById('kpiPlantCount').innerText = data.plant_count.toLocaleString();
+                document.getElementById('kpiBillCount').innerText = data.bill_count.toLocaleString();
+                document.getElementById('kpiSumKwh').innerText = Math.round(data.sum_kwh).toLocaleString();
+                document.getElementById('kpiSumPurchase').innerText = 'NT$ ' + data.sum_purchase_amount.toLocaleString();
+                document.getElementById('kpiSumPayable').innerText = 'NT$ ' + data.sum_payable_amount.toLocaleString();
+                document.getElementById('kpiAvgRate').innerText = data.avg_fit_rate.toFixed(4);
+            } catch (err) {
+                console.error('Failed to load KPIs:', err);
+            }
+        }
+
+        // Fetch filter options
+        async function fetchFilters() {
+            try {
+                const res = await fetch('/api/filters');
+                const opts = await res.json();
+
+                const custSel = document.getElementById('filterCustomer');
+                custSel.innerHTML = '<option value="">所有客戶</option>' + 
+                    opts.customers.map(c => `<option value="${c}">${c}</option>`).join('');
+
+                const monthSel = document.getElementById('filterMonth');
+                monthSel.innerHTML = '<option value="">所有帳單期別</option>' + 
+                    opts.months.map(m => `<option value="${m}">${m}</option>`).join('');
+
+                const citySel = document.getElementById('filterCity');
+                citySel.innerHTML = '<option value="">所有縣市</option>' + 
+                    opts.cities.map(c => `<option value="${c}">${c}</option>`).join('');
+            } catch (err) {
+                console.error('Failed to load filters:', err);
+            }
+        }
+
+        // Search debounce
+        function debounceSearch() {
+            clearTimeout(searchTimeout);
+            const val = document.getElementById('searchInput').value.trim();
+            document.getElementById('clearSearchBtn').style.display = val ? 'flex' : 'none';
+            searchTimeout = setTimeout(() => {
+                fetchBills();
+            }, 300);
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('clearSearchBtn').style.display = 'none';
+            fetchBills();
+        }
+
+        function resetFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('filterCustomer').value = '';
+            document.getElementById('filterMonth').value = '';
+            document.getElementById('filterCity').value = '';
+            document.getElementById('sortSelect').value = 'id_desc';
+            document.getElementById('clearSearchBtn').style.display = 'none';
+            fetchBills();
+        }
+
+        // Fetch bills list
+        async function fetchBills() {
+            const q = document.getElementById('searchInput').value.trim();
+            const customer = document.getElementById('filterCustomer').value;
+            const month = document.getElementById('filterMonth').value;
+            const city = document.getElementById('filterCity').value;
+            const sortVal = document.getElementById('sortSelect').value;
+            const [sort_by, order] = sortVal.split('_');
+
+            const params = new URLSearchParams();
+            if (q) params.set('q', q);
+            if (customer) params.set('customer', customer);
+            if (month) params.set('month', month);
+            if (city) params.set('city', city);
+            if (sort_by) params.set('sort_by', sort_by);
+            if (order) params.set('order', order);
+
+            const tbody = document.getElementById('billsTableBody');
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="py-12 text-center text-slate-400">
+                        <div class="inline-block animate-spin mb-2">
+                            <i data-lucide="loader-2" class="w-6 h-6 text-brand-600"></i>
+                        </div>
+                        <p>正在檢索資料庫...</p>
+                    </td>
+                </tr>
+            `;
+            lucide.createIcons();
+
+            try {
+                const res = await fetch(`/api/bills?${params.toString()}`);
+                const data = await res.json();
+                currentBills = data.bills;
+                document.getElementById('resultsCount').innerText = `共找到 ${data.total} 筆電費單記錄`;
+
+                if (!data.bills || data.bills.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="9" class="py-16 text-center text-slate-400">
+                                <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                                    <i data-lucide="search-x" class="w-6 h-6"></i>
+                                </div>
+                                <p class="font-medium text-slate-600">查無符合條件的電費單</p>
+                                <p class="text-xs text-slate-400 mt-1">請嘗試變更關鍵字或篩選條件，或點選上方「上傳電費單」</p>
+                            </td>
+                        </tr>
+                    `;
+                    lucide.createIcons();
+                    return;
+                }
+
+                tbody.innerHTML = data.bills.map(b => {
+                    const payableStr = b.net_payable_amount ? Math.round(b.net_payable_amount).toLocaleString() : '-';
+                    const kwhStr = b.total_kwh ? Math.round(b.total_kwh).toLocaleString() : '-';
+                    const capacityStr = b.installed_capacity_kw ? Number(b.installed_capacity_kw).toFixed(2) : '-';
+                    const rateStr = b.fit_rate ? Number(b.fit_rate).toFixed(4) : '-';
+                    const cityBadge = b.city ? `<span class="inline-block ml-1 px-1.5 py-0.5 text-[10px] rounded font-semibold bg-slate-100 text-slate-600 border border-slate-200">${b.city}</span>` : '';
+
+                    return `
+                        <tr class="hover:bg-slate-50/80 transition group">
+                            <td class="py-3 px-4">
+                                <span class="font-bold text-brand-900 block">${b.bill_year_month || '-'}</span>
+                                <span class="text-xs text-slate-400 block">${b.billing_period || ''}</span>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="flex items-center space-x-1.5 mb-1">
+                                    <span class="font-bold text-slate-900 text-sm">${b.site_name || '未設案場'}</span>
+                                </div>
+                                <span class="font-mono text-xs font-semibold text-brand-700 block">${b.electric_number || '-'}</span>
+                                <span class="text-[11px] font-mono text-slate-400 block">${b.contract_number || '-'}</span>
+                            </td>
+                            <td class="py-3 px-4">
+                                <span class="font-semibold text-slate-900 block">${b.customer_name || '-'}</span>
+                                <span class="text-xs text-slate-400 block">統編: ${b.tax_id || '-'}</span>
+                            </td>
+                            <td class="py-3 px-4 max-w-xs truncate" title="${b.plant_location || ''}">
+                                <div class="text-slate-800 text-xs">${b.plant_location || '-'} ${cityBadge}</div>
+                                <span class="text-[11px] text-slate-400">${b.taipower_branch || ''}</span>
+                            </td>
+                            <td class="py-3 px-4 text-right font-medium text-slate-700">${capacityStr}</td>
+                            <td class="py-3 px-4 text-right font-semibold text-slate-900">${kwhStr}</td>
+                            <td class="py-3 px-4 text-right text-xs text-slate-600 font-mono">${rateStr}</td>
+                            <td class="py-3 px-4 text-right">
+                                <span class="font-bold text-brand-700 text-sm">NT$ ${payableStr}</span>
+                            </td>
+                            <td class="py-3 px-4 text-center whitespace-nowrap">
+                                <div class="inline-flex items-center space-x-1.5">
+                                    <a 
+                                        href="/api/download/${b.id}" 
+                                        download
+                                        class="p-1.5 rounded-lg text-brand-700 bg-brand-50 hover:bg-brand-100 transition" 
+                                        title="下載此電費單 PDF"
+                                    >
+                                        <i data-lucide="download" class="w-4 h-4"></i>
+                                    </a>
+                                    <button 
+                                        onclick="openPreviewModal(${b.id})" 
+                                        class="p-1.5 rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition" 
+                                        title="線上預覽與核對"
+                                    >
+                                        <i data-lucide="eye" class="w-4 h-4"></i>
+                                    </button>
+                                    <button 
+                                        onclick="confirmDeleteBill(${b.id}, '${b.electric_number}')" 
+                                        class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" 
+                                        title="刪除記錄"
+                                    >
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                lucide.createIcons();
+            } catch (err) {
+                console.error('Failed to query bills:', err);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="py-8 text-center text-rose-500">
+                            查詢發生異常，請重試或確認伺服器連線。
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Folder Sync Action
+        async function triggerSyncFolder() {
+            const btn = document.getElementById('syncBtn');
+            const icon = document.getElementById('syncIcon');
+            icon.classList.add('animate-spin');
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/sync', { method: 'POST' });
+                const result = await res.json();
+                if (result.success) {
+                    showToast(result.message);
+                    fetchKPIs();
+                    fetchFilters();
+                    fetchBills();
+                } else {
+                    showToast(result.message || '同步失敗', true);
+                }
+            } catch (err) {
+                showToast('同步失敗: ' + err.message, true);
+            } finally {
+                icon.classList.remove('animate-spin');
+                btn.disabled = false;
+            }
+        }
+
+        // Export to Excel
+        function exportExcel() {
+            const q = document.getElementById('searchInput').value.trim();
+            const customer = document.getElementById('filterCustomer').value;
+            const month = document.getElementById('filterMonth').value;
+            const city = document.getElementById('filterCity').value;
+
+            const params = new URLSearchParams();
+            if (q) params.set('q', q);
+            if (customer) params.set('customer', customer);
+            if (month) params.set('month', month);
+            if (city) params.set('city', city);
+
+            window.location.href = `/api/export?${params.toString()}`;
+        }
+
+        // Upload Modal Handlers
+        function openUploadModal() {
+            selectedUploadFiles = [];
+            document.getElementById('uploadFileList').innerHTML = '';
+            document.getElementById('uploadFileList').classList.add('hidden');
+            document.getElementById('uploadStatusBox').classList.add('hidden');
+            document.getElementById('startUploadBtn').disabled = true;
+            document.getElementById('uploadModal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeUploadModal() {
+            document.getElementById('uploadModal').classList.add('hidden');
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            document.getElementById('dropZone').classList.add('border-brand-500', 'bg-brand-50');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            document.getElementById('dropZone').classList.remove('border-brand-500', 'bg-brand-50');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            document.getElementById('dropZone').classList.remove('border-brand-500', 'bg-brand-50');
+            if (e.dataTransfer.files.length) {
+                addFilesToUpload(e.dataTransfer.files);
+            }
+        }
+
+        function handleFileSelect(e) {
+            if (e.target.files.length) {
+                addFilesToUpload(e.target.files);
+            }
+        }
+
+        function addFilesToUpload(files) {
+            for (let f of files) {
+                if (f.name.toLowerCase().endsWith('.pdf')) {
+                    selectedUploadFiles.push(f);
+                }
+            }
+            renderUploadList();
+        }
+
+        function renderUploadList() {
+            const listDiv = document.getElementById('uploadFileList');
+            if (selectedUploadFiles.length === 0) {
+                listDiv.classList.add('hidden');
+                document.getElementById('startUploadBtn').disabled = true;
+                return;
+            }
+
+            listDiv.classList.remove('hidden');
+            document.getElementById('startUploadBtn').disabled = false;
+
+            listDiv.innerHTML = selectedUploadFiles.map((f, idx) => `
+                <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                    <div class="flex items-center space-x-2 truncate">
+                        <i data-lucide="file-text" class="w-4 h-4 text-brand-600 flex-shrink-0"></i>
+                        <span class="font-medium text-slate-800 truncate">${f.name}</span>
+                        <span class="text-slate-400">(${(f.size / 1024).toFixed(0)} KB)</span>
+                    </div>
+                    <button onclick="removeUploadFile(${idx})" class="text-slate-400 hover:text-rose-600 p-1">
+                        <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+            `).join('');
+
+            lucide.createIcons();
+        }
+
+        function removeUploadFile(idx) {
+            selectedUploadFiles.splice(idx, 1);
+            renderUploadList();
+        }
+
+        async function submitUpload() {
+            if (selectedUploadFiles.length === 0) return;
+
+            const statusBox = document.getElementById('uploadStatusBox');
+            const statusText = document.getElementById('uploadStatusText');
+            const uploadBtn = document.getElementById('startUploadBtn');
+
+            statusBox.classList.remove('hidden');
+            uploadBtn.disabled = true;
+            statusText.innerText = `正在上傳與 AI 辨識 ${selectedUploadFiles.length} 份電費單...`;
+
+            const formData = new FormData();
+            for (let f of selectedUploadFiles) {
+                formData.append('files', f);
+            }
+
+            try {
+                const res = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast(`成功辨識並新增 ${data.added_count} 筆電費單！`);
+                    closeUploadModal();
+                    fetchKPIs();
+                    fetchFilters();
+                    fetchBills();
+                } else {
+                    showToast('上傳解析失敗: ' + (data.errors ? data.errors.join(', ') : '未知錯誤'), true);
+                }
+            } catch (err) {
+                showToast('上傳過程發生錯誤: ' + err.message, true);
+            } finally {
+                statusBox.classList.add('hidden');
+                uploadBtn.disabled = false;
+            }
+        }
+
+        // Preview & Detail Modal
+        async function openPreviewModal(billId) {
+            activeBillId = billId;
+            isEditMode = false;
+            updateEditModeUI();
+
+            const iframe = document.getElementById('pdfIframe');
+            iframe.src = `/api/preview/${billId}`;
+
+            document.getElementById('modalDownloadBtn').href = `/api/download/${billId}`;
+            document.getElementById('modalOpenExternalBtn').href = `/api/preview/${billId}`;
+
+            try {
+                const res = await fetch(`/api/bills/${billId}`);
+                const b = await res.json();
+
+                document.getElementById('modalBillTitle').innerText = `${b.customer_name || '電費單'} - ${b.bill_year_month || ''}`;
+                document.getElementById('modalBillSubtitle').innerText = `電號: ${b.electric_number || '-'} | 契約編號: ${b.contract_number || '-'}`;
+                document.getElementById('modalPdfFilename').innerText = b.filename;
+
+                // Fill form fields
+                document.getElementById('fieldSiteName').value = b.site_name || '';
+                document.getElementById('fieldElectricNo').value = b.electric_number || '';
+                document.getElementById('fieldContractNo').value = b.contract_number || '';
+                document.getElementById('fieldCustomerName').value = b.customer_name || '';
+                document.getElementById('fieldTaxId').value = b.tax_id || '';
+                document.getElementById('fieldLocation').value = b.plant_location || '';
+                document.getElementById('fieldBillMonth').value = b.bill_year_month || '';
+                document.getElementById('fieldBillingPeriod').value = b.billing_period || '';
+
+                document.getElementById('fieldCapacity').value = b.installed_capacity_kw || '';
+                document.getElementById('fieldKwh').value = b.total_kwh || '';
+                document.getElementById('fieldRate').value = b.fit_rate || '';
+                document.getElementById('fieldPurchaseAmount').value = b.purchase_amount || '';
+                document.getElementById('fieldTaxAmount').value = b.tax_amount || '';
+                document.getElementById('fieldMeterRental').value = b.meter_rental_amount || '';
+                document.getElementById('fieldPayableAmount').value = b.net_payable_amount || '';
+
+                document.getElementById('fieldPaymentAccount').value = b.payment_account || '';
+                document.getElementById('fieldTaipowerBranch').value = b.taipower_branch || '';
+                document.getElementById('fieldMeterReadCurr').value = b.meter_read_curr || '';
+
+                // Render machines table
+                const machinesTbody = document.getElementById('modalMachinesBody');
+                if (b.machines && b.machines.length > 0) {
+                    machinesTbody.innerHTML = b.machines.map(m => `
+                        <tr class="hover:bg-slate-50">
+                            <td class="p-2.5 font-medium text-slate-800">${m.name || '機組'}</td>
+                            <td class="p-2.5 text-right font-mono text-slate-600">${m.rate ? Number(m.rate).toFixed(4) : '-'}</td>
+                            <td class="p-2.5 text-right font-semibold text-slate-900">${m.kwh ? Number(m.kwh).toLocaleString() : '-'}</td>
+                            <td class="p-2.5 text-right font-bold text-brand-700">NT$ ${m.amount ? Number(m.amount).toLocaleString() : '-'}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    machinesTbody.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="p-3 text-center text-slate-400">全廠單一機組費率計價</td>
+                        </tr>
+                    `;
+                }
+
+                document.getElementById('previewModal').classList.remove('hidden');
+                lucide.createIcons();
+            } catch (err) {
+                showToast('無法讀取電費單資料: ' + err.message, true);
+            }
+        }
+
+        function closePreviewModal() {
+            document.getElementById('previewModal').classList.add('hidden');
+            document.getElementById('pdfIframe').src = '';
+            activeBillId = null;
+        }
+
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            updateEditModeUI();
+        }
+
+        function cancelEditMode() {
+            isEditMode = false;
+            updateEditModeUI();
+            if (activeBillId) openPreviewModal(activeBillId);
+        }
+
+        function updateEditModeUI() {
+            const inputs = document.querySelectorAll('#previewModal input');
+            const editBtnText = document.getElementById('editBtnText');
+            const saveRow = document.getElementById('saveEditActionRow');
+
+            inputs.forEach(inp => {
+                if (isEditMode) {
+                    inp.removeAttribute('readonly');
+                    inp.classList.add('border-b', 'border-brand-500', 'bg-white');
+                } else {
+                    inp.setAttribute('readonly', 'true');
+                    inp.classList.remove('border-b', 'border-brand-500', 'bg-white');
+                }
+            });
+
+            editBtnText.innerText = isEditMode ? '鎖定檢視' : '編輯欄位';
+            saveRow.style.display = isEditMode ? 'flex' : 'none';
+        }
+
+        async function saveBillEdits() {
+            if (!activeBillId) return;
+
+            const payload = {
+                site_name: document.getElementById('fieldSiteName').value.trim(),
+                electric_number: document.getElementById('fieldElectricNo').value.trim(),
+                contract_number: document.getElementById('fieldContractNo').value.trim(),
+                customer_name: document.getElementById('fieldCustomerName').value.trim(),
+                tax_id: document.getElementById('fieldTaxId').value.trim(),
+                plant_location: document.getElementById('fieldLocation').value.trim(),
+                bill_year_month: document.getElementById('fieldBillMonth').value.trim(),
+                billing_period: document.getElementById('fieldBillingPeriod').value.trim(),
+                installed_capacity_kw: parseFloat(document.getElementById('fieldCapacity').value) || null,
+                total_kwh: parseFloat(document.getElementById('fieldKwh').value) || null,
+                fit_rate: parseFloat(document.getElementById('fieldRate').value) || null,
+                purchase_amount: parseFloat(document.getElementById('fieldPurchaseAmount').value) || null,
+                tax_amount: parseFloat(document.getElementById('fieldTaxAmount').value) || null,
+                meter_rental_amount: parseFloat(document.getElementById('fieldMeterRental').value) || null,
+                net_payable_amount: parseFloat(document.getElementById('fieldPayableAmount').value) || null,
+                payment_account: document.getElementById('fieldPaymentAccount').value.trim(),
+                taipower_branch: document.getElementById('fieldTaipowerBranch').value.trim(),
+                meter_read_curr: document.getElementById('fieldMeterReadCurr').value.trim(),
+            };
+
+            try {
+                const res = await fetch(`/api/bills/${activeBillId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await res.json();
+                if (result.success) {
+                    showToast('電費單資料更新成功！');
+                    isEditMode = false;
+                    updateEditModeUI();
+                    fetchKPIs();
+                    fetchBills();
+                } else {
+                    showToast('更新失敗: ' + (result.error || '未知錯誤'), true);
+                }
+            } catch (err) {
+                showToast('更新失敗: ' + err.message, true);
+            }
+        }
+
+        // Dispatch Modal Handlers
+        function openDispatchModal() {
+            document.getElementById('dispatchTextInput').value = '';
+            document.getElementById('dispatchModal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeDispatchModal() {
+            document.getElementById('dispatchModal').classList.add('hidden');
+        }
+
+        async function submitDispatchImport() {
+            const text = document.getElementById('dispatchTextInput').value.trim();
+            if (!text) {
+                showToast('請先貼上派送清冊文字', true);
+                return;
+            }
+
+            const btn = document.getElementById('submitDispatchBtn');
+            btn.disabled = true;
+            btn.innerText = '正在關聯案場中...';
+
+            try {
+                const res = await fetch('/api/dispatch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(data.message);
+                    closeDispatchModal();
+                    fetchKPIs();
+                    fetchBills();
+                } else {
+                    showToast('匯入失敗: ' + (data.error || '未知錯誤'), true);
+                }
+            } catch (err) {
+                showToast('匯入異常: ' + err.message, true);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = '立即解析並更新案場';
+            }
+        }
+
+        // Delete bill confirmation
+        async function confirmDeleteBill(billId, electricNo) {
+            if (!confirm(`確定要從資料庫刪除電號 [${electricNo}] 的電費單記錄嗎？\n(原始 PDF 檔案仍將保留於資料夾內)`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/bills/${billId}?delete_file=false`, {
+                    method: 'DELETE'
+                });
+                const result = await res.json();
+                if (result.success) {
+                    showToast('已刪除電費單記錄');
+                    fetchKPIs();
+                    fetchFilters();
+                    fetchBills();
+                } else {
+                    showToast('刪除失敗: ' + (result.error || '未知錯誤'), true);
+                }
+            } catch (err) {
+                showToast('刪除失敗: ' + err.message, true);
+            }
+        }
+    </script>
+</body>
+</html>
