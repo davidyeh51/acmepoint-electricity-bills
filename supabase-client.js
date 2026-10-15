@@ -126,10 +126,10 @@ const SEED_BILLS = [
   }
 ];
 
-// 預設專案連線設定（便於團隊無痛開箱即用）
+// 預設專案連線設定（全團隊開箱即用，免任何手動配置）
 window.DEFAULT_SUPABASE_CONFIG = window.DEFAULT_SUPABASE_CONFIG || {
   url: 'https://cowljafosekwvxithwjd.supabase.co',
-  anonKey: '' // 填入 anon public key 後全團隊開箱即連
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvd2xqYWZvc2Vrd3Z4aXRod2pkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2NTYzODcsImV4cCI6MjA5NDIzMjM4N30.c8YXP7EXDeTOw-mJEmnYZ_DJeZv6Qt6HVDzEf8J2K_I'
 };
 
 let supabaseInstance = null;
@@ -159,9 +159,11 @@ const SupabaseBillService = {
     }
 
     const defCfg = window.DEFAULT_SUPABASE_CONFIG || window.SUPABASE_CONFIG || {};
+    const localUrl = localStorage.getItem('SB_URL');
+    const localKey = localStorage.getItem('SB_ANON_KEY');
     return {
-      url: localStorage.getItem('SB_URL') || defCfg.url || 'https://cowljafosekwvxithwjd.supabase.co',
-      anonKey: localStorage.getItem('SB_ANON_KEY') || defCfg.anonKey || ''
+      url: (localUrl && localUrl.trim()) ? localUrl.trim() : (defCfg.url || 'https://cowljafosekwvxithwjd.supabase.co'),
+      anonKey: (localKey && localKey.trim()) ? localKey.trim() : (defCfg.anonKey || '')
     };
   },
 
