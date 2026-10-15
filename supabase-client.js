@@ -126,6 +126,12 @@ const SEED_BILLS = [
   }
 ];
 
+// 預設專案連線設定（便於團隊無痛開箱即用）
+window.DEFAULT_SUPABASE_CONFIG = window.DEFAULT_SUPABASE_CONFIG || {
+  url: 'https://cowljafosekwvxithwjd.supabase.co',
+  anonKey: '' // 填入 anon public key 後全團隊開箱即連
+};
+
 let supabaseInstance = null;
 
 const SupabaseBillService = {
@@ -135,7 +141,7 @@ const SupabaseBillService = {
       // 支援網址帶入 #sb_url=...&sb_key=... 或 ?sb_url=...&sb_key=...
       const rawHash = window.location.hash.replace(/^#/, '');
       const rawSearch = window.location.search.replace(/^\?/, '');
-      const searchStr = rawHash.includes('sb_url') ? rawHash : rawSearch;
+      const searchStr = rawHash.includes('sb_url') ? rawHash : (rawSearch.includes('sb_url') ? rawSearch : '');
       
       if (searchStr.includes('sb_url')) {
         const params = new URLSearchParams(searchStr);
@@ -144,7 +150,7 @@ const SupabaseBillService = {
         if (pUrl && pKey) {
           localStorage.setItem('SB_URL', pUrl.trim());
           localStorage.setItem('SB_ANON_KEY', pKey.trim());
-          // 清除網址雜訊以保護憑證
+          // 清除網址雜訊以保護憑證安全
           window.history.replaceState({}, document.title, window.location.pathname);
         }
       }
@@ -152,9 +158,10 @@ const SupabaseBillService = {
       console.warn("URL params parse note:", e);
     }
 
+    const defCfg = window.DEFAULT_SUPABASE_CONFIG || window.SUPABASE_CONFIG || {};
     return {
-      url: localStorage.getItem('SB_URL') || (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url) || '',
-      anonKey: localStorage.getItem('SB_ANON_KEY') || (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.anonKey) || ''
+      url: localStorage.getItem('SB_URL') || defCfg.url || 'https://cowljafosekwvxithwjd.supabase.co',
+      anonKey: localStorage.getItem('SB_ANON_KEY') || defCfg.anonKey || ''
     };
   },
 
@@ -179,6 +186,12 @@ const SupabaseBillService = {
         supabaseInstance = window.supabase.createClient(url.trim(), anonKey.trim());
         localStorage.setItem('SB_URL', url.trim());
         localStorage.setItem('SB_ANON_KEY', anonKey.trim());
+        
+        // 連線成功後，於背景自動嘗試將離線暫存的本地電費單（如五甲尾）同步至雲端
+        setTimeout(() => {
+          this.syncLocalBillsToCloud().catch(err => console.warn('Auto sync local bills error:', err));
+        }, 1500);
+
         return supabaseInstance;
       } catch (e) {
         console.error("Supabase client init failed:", e);
@@ -237,8 +250,11 @@ const SupabaseBillService = {
       try {
         let cloudFileUrl = billData.file_url;
         if (fileBlob) {
-          cloudFileUrl = await this.uploadPdfFile(fileBlob);
-          billData.file_url = cloudFileUrl;
+          const uploaded = await this.uploadPdfFile(fileBlob, billData.filename);
+          if (uploaded) {
+            cloudFileUrl = uploaded;
+            billData.file_url = cloudFileUrl;
+          }
         }
 
         // 整理寫入欄位
@@ -282,7 +298,10 @@ const SupabaseBillService = {
           .from('electricity_bills')
           .upsert(payload, { onConflict: 'filename' });
 
-        if (error) {
+        if (!error) {
+          billData.synced_to_cloud = true;
+          this.saveLocalBill(billData);
+        } else {
           console.warn("Supabase upsert warning:", error);
         }
       } catch (err) {
@@ -527,25 +546,130 @@ const SupabaseBillService = {
     };
   },
 
-  async uploadPdfFile(file) {
-    if (!this.isConfigured()) {
+  async uploadPdfFile(fileOrBlob, customFilename = '') {
+    if (!this.isConfigured() || !supabaseInstance) {
       return '';
     }
 
-    const cleanName = file.name.replace(/[^a-zA-Z0-9_\u4e00-\u9fa5.-]/g, '_');
+    const rawName = (fileOrBlob && fileOrBlob.name) || customFilename || 'bill.pdf';
+    const cleanName = rawName.replace(/[^a-zA-Z0-9_\u4e00-\u9fa5.-]/g, '_');
     const storagePath = `bills/${Date.now()}_${cleanName}`;
 
-    const { data, error } = await supabaseInstance.storage
-      .from('bills')
-      .upload(storagePath, file, { cacheControl: '3600', upsert: true });
+    try {
+      const { data, error } = await supabaseInstance.storage
+        .from('bills')
+        .upload(storagePath, fileOrBlob, { cacheControl: '3600', upsert: true, contentType: 'application/pdf' });
 
-    if (error) {
-      console.warn("Storage upload note:", error);
+      if (error) {
+        console.warn("Storage upload note:", error);
+        return '';
+      }
+
+      const { data: pubData } = supabaseInstance.storage.from('bills').getPublicUrl(storagePath);
+      return pubData ? pubData.publicUrl : '';
+    } catch (e) {
+      console.warn("Storage upload failed:", e);
       return '';
     }
+  },
 
-    const { data: pubData } = supabaseInstance.storage.from('bills').getPublicUrl(storagePath);
-    return pubData ? pubData.publicUrl : '';
+  // 自動將瀏覽器本地離線上傳之電費單（如五甲尾）同步至 Supabase 雲端
+  async syncLocalBillsToCloud() {
+    if (!this.isConfigured() || !supabaseInstance) {
+      return { success: false, syncedCount: 0, reason: '未連線 Supabase' };
+    }
+
+    const customList = this.getLocalBills();
+    if (!customList || customList.length === 0) {
+      return { success: true, syncedCount: 0 };
+    }
+
+    let syncedCount = 0;
+    for (let b of customList) {
+      try {
+        let cloudFileUrl = b.file_url;
+        // 若尚未有雲端 Storage 連結（或仍是 blob: 本地臨時連結），嘗試上傳 PDF 二進制
+        if (!cloudFileUrl || cloudFileUrl.startsWith('blob:') || !cloudFileUrl.includes('supabase.co')) {
+          if (b.filename) {
+            const blob = await PdfStorageDB.getPdf(b.filename);
+            if (blob) {
+              const uploaded = await this.uploadPdfFile(blob, b.filename);
+              if (uploaded) {
+                cloudFileUrl = uploaded;
+                b.file_url = cloudFileUrl;
+              }
+            }
+          }
+        }
+
+        const payload = {
+          filename: b.filename,
+          file_url: cloudFileUrl || null,
+          file_size: b.file_size || null,
+          electric_number: b.electric_number,
+          contract_number: b.contract_number,
+          site_name: b.site_name,
+          customer_name: b.customer_name,
+          customer_address: b.customer_address,
+          tax_id: b.tax_id,
+          bill_year_month: b.bill_year_month,
+          bill_year_month_ad: b.bill_year_month_ad,
+          billing_period: b.billing_period,
+          billing_start_ad: b.billing_start_ad || null,
+          billing_end_ad: b.billing_end_ad || null,
+          plant_location: b.plant_location,
+          city: b.city,
+          district: b.district,
+          installed_capacity_kw: b.installed_capacity_kw,
+          grid_capacity_kw: b.grid_capacity_kw,
+          total_kwh: b.total_kwh,
+          fit_rate: b.fit_rate,
+          purchase_amount: b.purchase_amount,
+          tax_amount: b.tax_amount,
+          total_bill_amount: b.total_bill_amount,
+          meter_rental_amount: b.meter_rental_amount,
+          net_payable_amount: b.net_payable_amount,
+          payment_account: b.payment_account,
+          taipower_branch: b.taipower_branch,
+          taipower_tel: b.taipower_tel,
+          meter_read_curr: b.meter_read_curr,
+          machines_json: b.machines || [],
+          status: 'PARSED',
+          updated_at: new Date().toISOString()
+        };
+
+        const { error } = await supabaseInstance
+          .from('electricity_bills')
+          .upsert(payload, { onConflict: 'filename' });
+
+        if (!error) {
+          b.synced_to_cloud = true;
+          syncedCount++;
+        }
+      } catch (err) {
+        console.warn("Sync local bill error:", b.filename, err);
+      }
+    }
+
+    if (syncedCount > 0) {
+      localStorage.setItem('CUSTOM_LOCAL_BILLS', JSON.stringify(customList));
+    }
+
+    // 亦將本地案場對照 SITE_MAPPINGS 同步至雲端
+    try {
+      const mappings = JSON.parse(localStorage.getItem('SITE_MAPPINGS') || '{}');
+      for (const [elecNo, sName] of Object.entries(mappings)) {
+        await supabaseInstance.from('site_mappings').upsert({
+          electric_number: elecNo,
+          site_name: sName,
+          updated_at: new Date().toISOString()
+        });
+      }
+    } catch (e) {
+      console.warn("Sync site mappings warning:", e);
+    }
+
+    return { success: true, syncedCount };
   },
 
   // 產生一鍵分享連結（附帶已設定之 Supabase 憑證，供團隊無痛連線）

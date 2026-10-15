@@ -99,12 +99,15 @@
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
         <!-- Cloud Notice Banner (if running in Demo mode) -->
-        <div id="demoNoticeBanner" class="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 flex items-center justify-between shadow-sm hidden">
+        <div id="demoNoticeBanner" class="p-3.5 rounded-xl bg-amber-50/95 border border-amber-200 text-xs text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-sm hidden">
             <div class="flex items-center space-x-2">
                 <i data-lucide="cloud-alert" class="w-4 h-4 text-amber-600 flex-shrink-0"></i>
-                <span><strong>目前以本地展示模式運作</strong>：若要同步至您的 Supabase 雲端資料庫（PostgreSQL 儲存與 PDF Storage 直傳），請點選右上方連線狀態進行配置。</span>
+                <span><strong>目前為本地展示模式</strong>：上傳之電費單僅儲存於本機瀏覽器，其他同仁無法同步查看。若要多人即時共享，請完成 Supabase 雲端設定或使用邀請連結！</span>
             </div>
-            <button onclick="openSupabaseSettingsModal()" class="px-2.5 py-1 text-xs font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300 rounded-lg transition whitespace-nowrap ml-2">設定 Supabase</button>
+            <button onclick="openSupabaseSettingsModal()" class="px-3 py-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition whitespace-nowrap shadow-sm flex items-center space-x-1">
+                <i data-lucide="link" class="w-3.5 h-3.5"></i>
+                <span>連線雲端資料庫</span>
+            </button>
         </div>
 
         <!-- KPI Dashboard Cards -->
@@ -176,13 +179,21 @@
                         type="text" 
                         id="searchInput"
                         oninput="debounceSearch()"
-                        placeholder="搜尋案場名稱（如美傢、賴侯）、電號、契約編號、地點、客戶或統編..."
-                        class="w-full pl-10 pr-10 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition"
+                        autocomplete="off"
+                        autocorrect="off"
+                        autocapitalize="off"
+                        spellcheck="false"
+                        placeholder="搜尋案場名稱（如美傢、賴侯、五甲尾）、電號、契約編號、地點、客戶或統編..."
+                        class="w-full pl-10 pr-20 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition"
                     >
+                    <div id="searchSpinner" class="hidden absolute inset-y-0 right-10 flex items-center pointer-events-none text-brand-600">
+                        <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
+                    </div>
                     <button 
                         onclick="clearSearch()" 
                         id="clearSearchBtn"
                         class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 hidden"
+                        title="清除搜尋關鍵字"
                     >
                         <i data-lucide="x-circle" class="w-4 h-4"></i>
                     </button>
@@ -289,9 +300,20 @@
                             <i data-lucide="share-2" class="w-4 h-4 text-emerald-600"></i>
                             <span>團隊免設定邀請連結</span>
                         </span>
-                        <button onclick="copyTeamShareLink()" class="px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-emerald-200/80 hover:bg-emerald-300 rounded-lg transition shadow-xs">一鍵複製</button>
+                        <button onclick="copyTeamShareLink()" class="px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-emerald-200 hover:bg-emerald-300 rounded-lg transition shadow-xs">一鍵複製</button>
                     </div>
-                    <p class="text-[11px] text-emerald-700 leading-relaxed">發送此連結給團隊成員，開啟後瀏覽器會自動完成 Supabase 雲端綁定，無需手動輸入金鑰！</p>
+                    <p class="text-[11px] text-emerald-700 leading-relaxed">發送此連結給團隊成員（LINE / Slack），開啟後全團隊自動連線至同一雲端資料庫，無需手動輸入金鑰！</p>
+                </div>
+
+                <div class="p-3 bg-indigo-50 rounded-xl border border-indigo-200 text-xs space-y-1.5 text-indigo-900">
+                    <div class="font-bold flex items-center justify-between">
+                        <span class="flex items-center space-x-1.5">
+                            <i data-lucide="refresh-cw" class="w-4 h-4 text-indigo-600"></i>
+                            <span>離線電費單雲端同步</span>
+                        </span>
+                        <button onclick="manualSyncOfflineBills()" type="button" class="px-2.5 py-1 text-xs font-semibold text-indigo-800 bg-indigo-200/80 hover:bg-indigo-300 rounded-lg transition shadow-xs">一鍵同步</button>
+                    </div>
+                    <p class="text-[11px] text-indigo-700 leading-relaxed">若您或同仁先前在「展示模式」下上傳過電費單（如五甲尾），點擊此處即可一鍵將本機暫存的帳單與 PDF 原檔推送至 Supabase 雲端！</p>
                 </div>
 
                 <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5 text-slate-600">
@@ -609,9 +631,18 @@
         let selectedUploadFiles = [];
         let searchTimeout = null;
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             lucide.createIcons();
             updateSupabaseStatusUI();
+            if (SupabaseBillService.isConfigured()) {
+                // 背景靜默同步本地離線電費單（如五甲尾）至雲端
+                SupabaseBillService.syncLocalBillsToCloud().then(res => {
+                    if (res && res.syncedCount > 0) {
+                        showToast(`🎉 已自動將本機 ${res.syncedCount} 筆離線電費單（含五甲尾等）同步至 Supabase 雲端！`);
+                        loadAllData();
+                    }
+                }).catch(e => console.warn('Background sync note:', e));
+            }
             loadAllData();
         });
 
@@ -702,12 +733,40 @@
                     throw new Error(error.message || '無法連線至 electricity_bills 資料表，請確認已執行 SQL 腳本！');
                 }
 
-                showToast('Supabase 連線成功！');
+                showToast('Supabase 連線成功！正在自動檢查離線帳單...');
                 closeSupabaseSettingsModal();
                 updateSupabaseStatusUI();
+
+                const syncRes = await SupabaseBillService.syncLocalBillsToCloud();
+                if (syncRes && syncRes.syncedCount > 0) {
+                    showToast(`🎉 連線成功！已自動將本地 ${syncRes.syncedCount} 筆電費單（含五甲尾等）同步至雲端！`);
+                } else {
+                    showToast('Supabase 連線成功！全團隊資料已即時連通！');
+                }
+
                 loadAllData();
             } catch (err) {
                 showToast('連線失敗: ' + err.message, true);
+            }
+        }
+
+        async function manualSyncOfflineBills() {
+            if (!SupabaseBillService.isConfigured()) {
+                showToast('請先完成 Supabase 連線後再同步！', true);
+                return;
+            }
+            showToast('正在掃描本機電費單並同步至雲端...');
+            try {
+                const res = await SupabaseBillService.syncLocalBillsToCloud();
+                if (res && res.syncedCount > 0) {
+                    showToast(`🎉 成功同步 ${res.syncedCount} 筆電費單（含五甲尾等）至 Supabase 雲端！`);
+                    await loadAllData();
+                } else {
+                    showToast('本機電費單已全部同步至雲端，無待同步資料！');
+                    await loadAllData();
+                }
+            } catch (e) {
+                showToast('同步發生錯誤: ' + e.message, true);
             }
         }
 
@@ -762,8 +821,30 @@
 
         function debounceSearch() {
             clearTimeout(searchTimeout);
-            const val = document.getElementById('searchInput').value.trim();
-            document.getElementById('clearSearchBtn').style.display = val ? 'flex' : 'none';
+            const inputEl = document.getElementById('searchInput');
+            let val = inputEl.value;
+
+            // 1. 自動防呆攔截：若使用者誤將 Supabase Project URL 貼入搜尋欄
+            if (val && (val.includes('supabase.co') || val.includes('supabase.in') || (val.startsWith('http') && val.includes('supabase')))) {
+                const trimmedUrl = val.trim();
+                inputEl.value = '';
+                document.getElementById('clearSearchBtn').style.display = 'none';
+                openSupabaseSettingsModal();
+                document.getElementById('sbUrlInput').value = trimmedUrl;
+                showToast('已為您自動將 Supabase 網址填入設定視窗！請接著填入 Anon Public Key 即可連線。');
+                const keyInput = document.getElementById('sbAnonKeyInput');
+                if (keyInput) keyInput.focus();
+                renderBillsTable();
+                return;
+            }
+
+            const trimmed = val.trim();
+            document.getElementById('clearSearchBtn').style.display = trimmed ? 'flex' : 'none';
+
+            // 顯示微型載入轉圈，避免清空整張表格造成劇烈抖動跳躍
+            const spinner = document.getElementById('searchSpinner');
+            if (spinner) spinner.classList.remove('hidden');
+
             searchTimeout = setTimeout(() => {
                 renderBillsTable();
             }, 300);
@@ -786,6 +867,9 @@
         }
 
         async function renderBillsTable() {
+            const spinner = document.getElementById('searchSpinner');
+            if (spinner) spinner.classList.remove('hidden');
+
             const keyword = document.getElementById('searchInput').value.trim();
             const customer = document.getElementById('filterCustomer').value;
             const month = document.getElementById('filterMonth').value;
@@ -794,24 +878,34 @@
             const [sortBy, order] = sortVal.split('_');
 
             const tbody = document.getElementById('billsTableBody');
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="9" class="py-12 text-center text-slate-400">
-                        <div class="inline-block animate-spin mb-2">
-                            <i data-lucide="loader-2" class="w-6 h-6 text-brand-600"></i>
-                        </div>
-                        <p>正在檢索資料庫...</p>
-                    </td>
-                </tr>
-            `;
-            lucide.createIcons();
+            const hasExistingRows = tbody && tbody.children.length > 0 && !tbody.querySelector('.animate-spin');
+
+            // 僅在第一次且完全無內容時才顯示佔位 spinner；已有資料時僅微調透明度，杜絕畫面跳動
+            if (!hasExistingRows) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="py-12 text-center text-slate-400">
+                            <div class="inline-block animate-spin mb-2">
+                                <i data-lucide="loader-2" class="w-6 h-6 text-brand-600"></i>
+                            </div>
+                            <p>正在檢索資料庫...</p>
+                        </td>
+                    </tr>
+                `;
+                lucide.createIcons();
+            } else {
+                tbody.classList.add('opacity-40');
+            }
 
             try {
                 const { bills, total, isDemo } = await SupabaseBillService.fetchBills({
                     keyword, customer, month, city, sortBy, order
                 });
                 currentBills = bills;
-                document.getElementById('resultsCount').innerText = `共找到 ${total} 筆電費單記錄 ${isDemo ? '(展示資料)' : '(Supabase 雲端資料)'}`;
+                const resultsCountEl = document.getElementById('resultsCount');
+                if (resultsCountEl) {
+                    resultsCountEl.innerText = `共找到 ${total} 筆電費單記錄 ${isDemo ? '(本地展示資料)' : '(Supabase 雲端資料)'}`;
+                }
 
                 if (!bills || bills.length === 0) {
                     tbody.innerHTML = `
@@ -835,9 +929,6 @@
                     const capacityStr = b.installed_capacity_kw ? Number(b.installed_capacity_kw).toFixed(2) : '-';
                     const rateStr = b.fit_rate ? Number(b.fit_rate).toFixed(4) : '-';
                     const cityBadge = b.city ? `<span class="inline-block ml-1 px-1.5 py-0.5 text-[10px] rounded font-semibold bg-slate-100 text-slate-600 border border-slate-200">${b.city}</span>` : '';
-
-                    // Resolve PDF download url
-                    const downloadUrl = b.file_url || (b.filename ? `客戶電費單資料庫/${b.filename}` : '#');
 
                     return `
                         <tr class="hover:bg-slate-50/80 transition group">
@@ -898,6 +989,9 @@
                         </td>
                     </tr>
                 `;
+            } finally {
+                tbody.classList.remove('opacity-40');
+                if (spinner) spinner.classList.add('hidden');
             }
         }
 
@@ -1325,7 +1419,11 @@
             await loadAllData();
 
             if (successCount > 0) {
-                showToast(`🎉 成功上傳並辨識 ${successCount} 份電費單，已納入資料庫！`);
+                if (SupabaseBillService.isConfigured()) {
+                    showToast(`🎉 成功上傳並辨識 ${successCount} 份電費單，已同步至 Supabase 雲端資料庫！全團隊皆可即時查看。`);
+                } else {
+                    showToast(`🎉 成功辨識 ${successCount} 份電費單！（提醒：目前為本地展示模式，僅存於這台電腦，請連線 Supabase 即可與團隊同步）`);
+                }
             }
             if (errors.length > 0) {
                 showToast(`部分檔案處理異常：${errors.join('; ')}`, true);
