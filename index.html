@@ -31,6 +31,13 @@
     </script>
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- PDF.js for Client-Side PDF Text Extraction & Recognition -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        if (window.pdfjsLib) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+    </script>
     <!-- Supabase JS SDK (Official CDN) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- SheetJS for Client-side Excel Export -->
@@ -274,6 +281,17 @@
                     <label class="block text-xs font-semibold text-slate-700 mb-1">Anon Public Key</label>
                     <input type="password" id="sbAnonKeyInput" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..." class="w-full text-xs font-mono p-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-500">
                     <span class="text-[11px] text-slate-400 block mt-0.5">於 Supabase 專案 Settings → API → Project API keys 複製 anon public key</span>
+                </div>
+
+                <div id="shareLinkBox" class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs space-y-1.5 text-emerald-900 hidden">
+                    <div class="font-bold flex items-center justify-between">
+                        <span class="flex items-center space-x-1.5">
+                            <i data-lucide="share-2" class="w-4 h-4 text-emerald-600"></i>
+                            <span>團隊免設定邀請連結</span>
+                        </span>
+                        <button onclick="copyTeamShareLink()" class="px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-emerald-200/80 hover:bg-emerald-300 rounded-lg transition shadow-xs">一鍵複製</button>
+                    </div>
+                    <p class="text-[11px] text-emerald-700 leading-relaxed">發送此連結給團隊成員，開啟後瀏覽器會自動完成 Supabase 雲端綁定，無需手動輸入金鑰！</p>
                 </div>
 
                 <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5 text-slate-600">
@@ -636,10 +654,29 @@
         // Supabase Settings Modal
         function openSupabaseSettingsModal() {
             const cfg = SupabaseBillService.getStoredConfig();
-            document.getElementById('sbUrlInput').value = cfg.url;
-            document.getElementById('sbAnonKeyInput').value = cfg.anonKey;
+            document.getElementById('sbUrlInput').value = cfg.url || '';
+            document.getElementById('sbAnonKeyInput').value = cfg.anonKey || '';
+            const shareBox = document.getElementById('shareLinkBox');
+            if (cfg.url && cfg.anonKey) {
+                shareBox.classList.remove('hidden');
+            } else {
+                shareBox.classList.add('hidden');
+            }
             document.getElementById('supabaseSettingsModal').classList.remove('hidden');
             lucide.createIcons();
+        }
+
+        function copyTeamShareLink() {
+            const url = SupabaseBillService.generateShareUrl();
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(() => {
+                    showToast('已複製團隊免設定邀請連結！發給團隊成員即可直接自動連線！');
+                }).catch(() => {
+                    prompt('請複製以下團隊連線連結發給成員：', url);
+                });
+            } else {
+                prompt('請複製以下團隊連線連結發給成員：', url);
+            }
         }
 
         function closeSupabaseSettingsModal() {
@@ -831,18 +868,16 @@
                             </td>
                             <td class="py-3 px-4 text-center whitespace-nowrap">
                                 <div class="inline-flex items-center space-x-1.5">
-                                    <a 
-                                        href="${downloadUrl}" 
-                                        download="${b.filename || '電費單.pdf'}"
-                                        target="_blank"
-                                        class="p-1.5 rounded-lg text-brand-700 bg-brand-50 hover:bg-brand-100 transition" 
+                                    <button 
+                                        onclick="downloadBill(${idx})" 
+                                        class="p-1.5 rounded-lg text-brand-700 bg-brand-50 hover:bg-brand-100 transition cursor-pointer" 
                                         title="下載此電費單 PDF"
                                     >
                                         <i data-lucide="download" class="w-4 h-4"></i>
-                                    </a>
+                                    </button>
                                     <button 
                                         onclick="openPreviewModal(${idx})" 
-                                        class="p-1.5 rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition" 
+                                        class="p-1.5 rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition cursor-pointer" 
                                         title="線上預覽與核對"
                                     >
                                         <i data-lucide="eye" class="w-4 h-4"></i>
@@ -1020,6 +1055,205 @@
             renderUploadList();
         }
 
+        // -------------------------------------------------------------
+        // Client-side Taipower Bill Parsing Engine (Pure JS + PDF.js)
+        // -------------------------------------------------------------
+        function parseTaipowerBillFromText(fullText, lines, filename) {
+            const data = {
+                filename: filename,
+                status: 'PARSED'
+            };
+
+            // 1. 電號 (e.g. 08-40-8620-12-7)
+            let m = fullText.match(/(\d{2}-\d{2}-\d{4}-\d{2}-\d{1})/);
+            if (!m && filename) {
+                m = filename.match(/(\d{2}-\d{2}-\d{4}-\d{2}-\d{1})/);
+            }
+            data.electric_number = m ? m[1] : '';
+
+            // 2. 契約編號 (e.g. 08-PV-109-0339 or 10-PV-106-0047)
+            m = fullText.match(/(\d{2}-[A-Za-z0-9]{2}-\d{3}-\d{4})/);
+            data.contract_number = m ? m[1] : '';
+
+            // 3. 帳單年月 (e.g. 115年10月)
+            m = fullText.match(/(\d{2,3}年\d{1,2}月)/);
+            data.bill_year_month = m ? m[1] : '';
+            if (data.bill_year_month) {
+                const ym = data.bill_year_month.match(/(\d{2,3})年(\d{1,2})月/);
+                if (ym) {
+                    data.bill_year_month_ad = `${parseInt(ym[1]) + 1911}-${String(ym[2]).padStart(2, '0')}`;
+                }
+            } else {
+                const now = new Date();
+                const rocYear = now.getFullYear() - 1911;
+                data.bill_year_month = `${rocYear}年${now.getMonth() + 1}月`;
+                data.bill_year_month_ad = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            }
+
+            // 4. 計費期間
+            m = fullText.match(/計費期間[：:]\s*([0-9]{2,3}年[0-9]{1,2}月[0-9]{1,2}日\s*~\s*[0-9]{2,3}年[0-9]{1,2}月[0-9]{1,2}日)/) ||
+                fullText.match(/([0-9]{2,3}年[0-9]{1,2}月[0-9]{1,2}日\s*~\s*[0-9]{2,3}年[0-9]{1,2}月[0-9]{1,2}日)/);
+            if (m) {
+                data.billing_period = m[1].replace(/\s+/g, '');
+                const parts = data.billing_period.split('~');
+                if (parts.length === 2) {
+                    const p0 = parts[0].match(/(\d{2,3})年(\d{1,2})月(\d{1,2})日/);
+                    const p1 = parts[1].match(/(\d{2,3})年(\d{1,2})月(\d{1,2})日/);
+                    if (p0) data.billing_start_ad = `${parseInt(p0[1]) + 1911}-${String(p0[2]).padStart(2, '0')}-${String(p0[3]).padStart(2, '0')}`;
+                    if (p1) data.billing_end_ad = `${parseInt(p1[1]) + 1911}-${String(p1[2]).padStart(2, '0')}-${String(p1[3]).padStart(2, '0')}`;
+                }
+            } else {
+                data.billing_period = '';
+            }
+
+            // 5. 用戶名稱 & 地址
+            data.customer_name = '';
+            data.customer_address = '';
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].includes('先生/女士/寶號') && i > 0) {
+                    data.customer_name = lines[i - 1].trim();
+                    for (let k = 2; k <= 5; k++) {
+                        if (i - k >= 0) {
+                            const cand = lines[i - k].trim();
+                            if (['市', '縣', '路', '街', '段', '號'].some(x => cand.includes(x))) {
+                                data.customer_address = cand;
+                                break;
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+
+            // 6. 統編
+            m = fullText.match(/統一編號[：:]?\s*(\d{8})/);
+            data.tax_id = m ? m[1] : '';
+
+            // 7. 設置地點
+            m = fullText.match(/設置地點[：:]\s*([^\n\r]+)/);
+            data.plant_location = m ? m[1].trim() : '';
+
+            const cityM = data.plant_location.match(/(基隆市|台北市|新北市|桃園市|新竹市|新竹縣|苗栗縣|台中市|彰化縣|南投縣|雲林縣|嘉義市|嘉義縣|台南市|高雄市|屏東縣|宜蘭縣|花蓮縣|台東縣|澎湖縣|金門縣|連江縣)/);
+            data.city = cityM ? cityM[1] : '';
+            if (data.city) {
+                const distM = data.plant_location.match(new RegExp(data.city + '([^市縣0-9、]+?[市區鄉鎮])'));
+                data.district = distM ? distM[1] : '';
+            } else {
+                data.district = '';
+            }
+
+            // 8. 裝置容量
+            m = fullText.match(/併聯總裝置容量[^\d]*([0-9.]+)/);
+            data.installed_capacity_kw = m ? parseFloat(m[1]) : null;
+
+            // 9. 購售電容量
+            m = fullText.match(/併聯總購售電容量[^\d]*([0-9.]+)/);
+            data.grid_capacity_kw = m ? parseFloat(m[1]) : data.installed_capacity_kw;
+
+            // 10. 金額
+            m = fullText.match(/購電電費\s*[\n\r]*([0-9,]+)/);
+            data.purchase_amount = m ? parseInt(m[1].replace(/,/g, '')) : null;
+
+            m = fullText.match(/營業稅\s*[\n\r]*([0-9,]+)/);
+            data.tax_amount = m ? parseInt(m[1].replace(/,/g, '')) : null;
+
+            m = fullText.match(/本期電表租費\s*[\n\r]*([-0-9,]+)/);
+            data.meter_rental_amount = m ? parseInt(m[1].replace(/,/g, '')) : 0;
+
+            m = fullText.match(/本期電費合計\s*[\n\r]*([0-9,]+)/);
+            data.total_bill_amount = m ? parseInt(m[1].replace(/,/g, '')) : null;
+
+            const mAll = [...fullText.matchAll(/應付總金額\s*[\n\r]*([0-9,]+)/g)];
+            if (mAll.length > 0) {
+                const valid = mAll.map(x => parseInt(x[1].replace(/,/g, ''))).filter(n => n >= 100);
+                data.net_payable_amount = valid.length ? valid[0] : null;
+            }
+
+            if (!data.total_bill_amount && data.purchase_amount && data.tax_amount) {
+                data.total_bill_amount = data.purchase_amount + data.tax_amount;
+            }
+            if (!data.net_payable_amount && data.total_bill_amount) {
+                data.net_payable_amount = data.total_bill_amount + (data.meter_rental_amount || 0);
+            }
+
+            // 11. 總度數
+            m = fullText.match(/=\s*([0-9,]+)\s*度/) || fullText.match(/度數\s*[\n\r]*([0-9,]+)/);
+            data.total_kwh = m ? parseInt(m[1].replace(/,/g, '')) : null;
+
+            // 12. 費率
+            m = fullText.match(/費率\s*[\n\r]*([0-9.]+)/);
+            data.fit_rate = m ? parseFloat(m[1]) : null;
+
+            // 13. 自動關聯案場名稱 (Site Name Mapping)
+            const mappings = JSON.parse(localStorage.getItem('SITE_MAPPINGS') || '{}');
+            if (data.electric_number === '08-40-8620-12-7') {
+                data.site_name = '美傢家具鹿港廠1';
+            } else if (data.electric_number === '10-56-4770-02-1') {
+                data.site_name = '賴侯淑貞';
+            } else if (mappings[data.electric_number]) {
+                data.site_name = mappings[data.electric_number];
+            } else {
+                data.site_name = filename.replace(/\.pdf$/i, '');
+            }
+
+            // 若電號已有先前記帳歷史，智慧補齊基本資料
+            if (data.electric_number) {
+                const existing = currentBills.find(b => b.electric_number === data.electric_number);
+                if (existing) {
+                    if (!data.customer_name) data.customer_name = existing.customer_name;
+                    if (!data.customer_address) data.customer_address = existing.customer_address;
+                    if (!data.tax_id) data.tax_id = existing.tax_id;
+                    if (!data.plant_location) data.plant_location = existing.plant_location;
+                    if (!data.city) data.city = existing.city;
+                    if (!data.district) data.district = existing.district;
+                    if (!data.installed_capacity_kw) data.installed_capacity_kw = existing.installed_capacity_kw;
+                    if (!data.fit_rate) data.fit_rate = existing.fit_rate;
+                    if (!data.contract_number) data.contract_number = existing.contract_number;
+                    if (!data.site_name || data.site_name === filename.replace(/\.pdf$/i, '')) {
+                        data.site_name = existing.site_name;
+                    }
+                }
+            }
+
+            return data;
+        }
+
+        async function parsePdfClientSide(file) {
+            let fullText = "";
+            let lines = [];
+            if (window.pdfjsLib) {
+                try {
+                    const buffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        let curLine = "";
+                        let lastY = null;
+                        for (let item of textContent.items) {
+                            if (!item.str) continue;
+                            const curY = item.transform ? item.transform[5] : null;
+                            if (lastY !== null && curY !== null && Math.abs(curY - lastY) > 5) {
+                                if (curLine.trim()) lines.push(curLine.trim());
+                                curLine = item.str;
+                            } else {
+                                curLine += (curLine ? " " : "") + item.str;
+                            }
+                            lastY = curY;
+                        }
+                        if (curLine.trim()) lines.push(curLine.trim());
+                        fullText += lines.join("\n") + "\n";
+                    }
+                } catch (e) {
+                    console.warn("Client PDF.js extract note:", e);
+                }
+            }
+
+            const parsed = parseTaipowerBillFromText(fullText, lines, file.name);
+            parsed.file_size = file.size;
+            return parsed;
+        }
+
         async function submitUpload() {
             if (selectedUploadFiles.length === 0) return;
 
@@ -1029,30 +1263,81 @@
 
             statusBox.classList.remove('hidden');
             uploadBtn.disabled = true;
-            statusText.innerText = `正在上傳 ${selectedUploadFiles.length} 份電費單...`;
 
+            let successCount = 0;
+            const errors = [];
+
+            // 檢查本地是否有 Python Starlette 伺服器運作中
+            let isLocalBackend = false;
             try {
-                if (SupabaseBillService.isConfigured()) {
-                    for (let f of selectedUploadFiles) {
-                        const publicUrl = await SupabaseBillService.uploadPdfFile(f);
-                        console.log('Uploaded to Supabase:', publicUrl);
+                const testRes = await fetch('/api/kpi', { method: 'GET', signal: AbortSignal.timeout(800) });
+                if (testRes.ok) isLocalBackend = true;
+            } catch(e) {}
+
+            for (let i = 0; i < selectedUploadFiles.length; i++) {
+                const f = selectedUploadFiles[i];
+                statusText.innerText = `正在解析並儲存 [${i + 1}/${selectedUploadFiles.length}]：${f.name}...`;
+
+                try {
+                    // 若在本地伺服器運作，優先呼叫 Python 後端 OCR 與檔案儲存
+                    if (isLocalBackend) {
+                        const formData = new FormData();
+                        formData.append('files', f);
+                        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.results && data.results.length > 0) {
+                                successCount++;
+                                continue;
+                            }
+                        }
                     }
-                    showToast(`成功直傳 ${selectedUploadFiles.length} 份電費單至 Supabase Storage！`);
-                } else {
-                    showToast(`[展示模式] 已接收 ${selectedUploadFiles.length} 份檔案，請至本地伺服器或連線 Supabase 進行完整辨識！`);
+
+                    // 瀏覽器端純前端智慧解析引擎（支援 GitHub Pages 離線/雲端混合）
+                    const billData = await parsePdfClientSide(f);
+
+                    // 存入 IndexedDB、LocalStorage，若有連線 Supabase 則同步上傳雲端
+                    await SupabaseBillService.saveBill(billData, f);
+                    successCount++;
+                } catch (err) {
+                    console.error("Upload error for file:", f.name, err);
+                    errors.push(`${f.name}: ${err.message}`);
                 }
-                closeUploadModal();
-                loadAllData();
-            } catch (err) {
-                showToast('上傳失敗: ' + err.message, true);
-            } finally {
-                statusBox.classList.add('hidden');
-                uploadBtn.disabled = false;
+            }
+
+            statusBox.classList.add('hidden');
+            uploadBtn.disabled = false;
+            selectedUploadFiles = [];
+            renderUploadList();
+            closeUploadModal();
+
+            // 重新載入數據與更新介面
+            await loadAllData();
+
+            if (successCount > 0) {
+                showToast(`🎉 成功上傳並辨識 ${successCount} 份電費單，已納入資料庫！`);
+            }
+            if (errors.length > 0) {
+                showToast(`部分檔案處理異常：${errors.join('; ')}`, true);
             }
         }
 
+        // 下載電費單 PDF 檔案
+        async function downloadBill(index) {
+            const b = currentBills[index];
+            if (!b) return;
+            const url = await SupabaseBillService.getBillFileUrl(b);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = b.filename || '電費單.pdf';
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
         // Preview & Detail Modal
-        function openPreviewModal(index) {
+        async function openPreviewModal(index) {
             const b = currentBills[index];
             if (!b) return;
 
@@ -1060,9 +1345,10 @@
             isEditMode = false;
             updateEditModeUI();
 
-            const previewUrl = b.file_url || (b.filename ? `客戶電費單資料庫/${b.filename}` : '');
+            const previewUrl = await SupabaseBillService.getBillFileUrl(b);
             document.getElementById('pdfIframe').src = previewUrl;
             document.getElementById('modalDownloadBtn').href = previewUrl;
+            document.getElementById('modalDownloadBtn').download = b.filename || '電費單.pdf';
             document.getElementById('modalOpenExternalBtn').href = previewUrl;
 
             document.getElementById('modalBillTitle').innerText = `${b.site_name || b.customer_name || '電費單'} - ${b.bill_year_month || ''}`;

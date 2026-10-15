@@ -21,12 +21,14 @@ from .database import (
 from .parser import parse_taiwan_power_bill
 from .sync_service import sync_folder
 
-HTML_FILE = Path(__file__).resolve().parent / "templates" / "index.html"
+ROOT_HTML = Path(__file__).resolve().parent.parent / "index.html"
+TEMPLATE_HTML = Path(__file__).resolve().parent / "templates" / "index.html"
 
 async def index_view(request: Request):
     """Serve the Single-Page Application."""
-    if HTML_FILE.exists():
-        content = HTML_FILE.read_text(encoding="utf-8")
+    target = ROOT_HTML if ROOT_HTML.exists() else TEMPLATE_HTML
+    if target.exists():
+        content = target.read_text(encoding="utf-8")
         return HTMLResponse(content)
     return HTMLResponse("<h1>UI template not found.</h1>", status_code=404)
 
@@ -236,6 +238,9 @@ async def api_import_dispatch(request: Request):
     res = import_dispatch_list(text)
     return JSONResponse(res)
 
+from starlette.routing import Route, Mount
+from starlette.staticfiles import StaticFiles
+
 routes = [
     Route("/", endpoint=index_view, methods=["GET"]),
     Route("/api/bills", endpoint=api_list_bills, methods=["GET"]),
@@ -250,6 +255,7 @@ routes = [
     Route("/api/download/{bill_id:int}", endpoint=api_download, methods=["GET"]),
     Route("/api/preview/{bill_id:int}", endpoint=api_preview, methods=["GET"]),
     Route("/api/export", endpoint=api_export_excel, methods=["GET"]),
+    Mount("/客戶電費單資料庫", app=StaticFiles(directory=str(BILLS_DIR)), name="bills_static"),
 ]
 
 init_db()

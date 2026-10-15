@@ -70,6 +70,7 @@ def extract_text_from_pdf(pdf_path: Path) -> Tuple[List[str], str]:
     If digital text exists (>80 chars), extract directly.
     Otherwise, render page to image and use RapidOCR.
     """
+    all_direct_lines = []
     with pymupdf.open(pdf_path) as doc:
         for page in doc:
             txt = page.get_text()
