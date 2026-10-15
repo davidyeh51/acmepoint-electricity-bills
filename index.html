@@ -963,10 +963,20 @@
             btn.innerText = '正在關聯案場中...';
 
             try {
+                // 若本機 Python 伺服器運作中，亦同步更新本機 SQLite
+                try {
+                    await fetch('/api/dispatch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text }),
+                        signal: AbortSignal.timeout(800)
+                    });
+                } catch(e) {}
+
                 const res = await SupabaseBillService.importDispatchText(text);
                 showToast(res.message);
                 closeDispatchModal();
-                loadAllData();
+                await loadAllData();
             } catch (err) {
                 showToast('匯入異常: ' + err.message, true);
             } finally {

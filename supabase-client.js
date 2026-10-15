@@ -408,24 +408,67 @@ const SupabaseBillService = {
   async importDispatchText(text) {
     const lines = text.trim().split(/\r?\n/).filter(l => l.trim());
     const records = [];
+    const seen = new Set();
 
-    for (let line of lines) {
-      if (line.includes('電號') && line.includes('案場')) continue;
-      const parts = line.split(/\t+|\s{2,}/);
-      if (parts.length >= 2) {
-        let elecNo = parts[0].trim();
-        let siteName = parts[1].trim();
-        let fname = parts[4] ? parts[4].trim() : '';
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      // Skip header line only if it doesn't contain a real electric number
+      if (line.includes('電號') && line.includes('案場') && !/\d{2}-\d{2}/.test(line)) continue;
 
-        const m = elecNo.match(/\d{2}-\d{2}-\d{4}-\d{2}-\d{1}/);
-        if (m) elecNo = m[0];
-        if (elecNo && siteName) {
-          records.push({ electric_number: elecNo, site_name: siteName, filename: fname });
+      const mElec = line.match(/(\d{2}-\d{2}-\d{4}-\d{2}-\d{1})/);
+      if (!mElec) continue;
+      const elecNo = mElec[1];
+
+      let siteName = '';
+      let fname = '';
+
+      // Pattern 1: Brackets format: [10-56-4770-02-1] 賴侯淑貞 or 2. [10-56-4770-02-1] 賴侯淑貞
+      const escapedElec = elecNo.replace(/-/g, '\\-');
+      const mBracket = line.match(new RegExp('\\[' + escapedElec + '\\]\\s*[-—:：]?\\s*([^\\s\\t|]+)'));
+      if (mBracket) {
+        siteName = mBracket[1].trim();
+      }
+
+      // Pattern 2: Key-value: 案場[名稱]?[:：]?\s*([^\s]+)
+      if (!siteName) {
+        const mKV = line.match(/(?:案場|案場名稱)[：:]\s*([^\s,，|]+)/);
+        if (mKV) siteName = mKV[1].trim();
+      }
+
+      // Pattern 3: Delimited by tabs, pipes, or spaces (e.g. 10-56-4770-02-1 賴侯淑貞)
+      if (!siteName) {
+        const cleaned = line.replace(/^\s*(?:\d+[.)]|[-*])\s*/, '');
+        const parts = cleaned.split(/[\t|]+|\s{1,}/).map(p => p.trim()).filter(Boolean);
+        for (let j = 0; j < parts.length; j++) {
+          if (parts[j].includes(elecNo)) {
+            if (j + 1 < parts.length && !/^\d{8}$/.test(parts[j + 1]) && !parts[j + 1].endsWith('.pdf')) {
+              siteName = parts[j + 1];
+            } else if (j > 0 && !/^\d{8}$/.test(parts[j - 1])) {
+              siteName = parts[j - 1];
+            }
+            break;
+          }
         }
+      }
+
+      // Pattern 4: Check if pdf filename exists in line
+      const mPdf = line.match(/([0-9a-zA-Z_\-]+\.pdf)/i);
+      if (mPdf) fname = mPdf[1];
+
+      // Clean siteName from punctuation or trailing brackets
+      if (siteName) {
+        siteName = siteName.replace(/[\[\]()（）]/g, '').trim();
+      }
+
+      if (elecNo && siteName && !seen.has(elecNo)) {
+        seen.add(elecNo);
+        records.push({ electric_number: elecNo, site_name: siteName, filename: fname });
       }
     }
 
-    if (!records.length) throw new Error('未能識別出有效的電號與案場名稱');
+    if (!records.length) {
+      throw new Error('未能識別出有效的電號與案場名稱（請確保包含如 10-56-4770-02-1 與對應案場名稱）');
+    }
 
     // 儲存至本地對照快取
     const mappings = JSON.parse(localStorage.getItem('SITE_MAPPINGS') || '{}');
@@ -434,28 +477,34 @@ const SupabaseBillService = {
     }
     localStorage.setItem('SITE_MAPPINGS', JSON.stringify(mappings));
 
-    if (!this.isConfigured()) {
-      let updated = 0;
-      const customList = this.getLocalBills();
-      for (let r of records) {
-        for (let b of customList) {
-          if (b.electric_number === r.electric_number || (r.filename && b.filename === r.filename)) {
-            b.site_name = r.site_name;
-            updated++;
-          }
-        }
-        for (let b of SEED_BILLS) {
-          if (b.electric_number === r.electric_number || (r.filename && b.filename === r.filename)) {
-            b.site_name = r.site_name;
-            updated++;
-          }
+    // Also update existing local bills
+    let updated = 0;
+    const customList = this.getLocalBills();
+    for (let r of records) {
+      for (let b of customList) {
+        if (b.electric_number === r.electric_number || (r.filename && b.filename === r.filename)) {
+          b.site_name = r.site_name;
+          updated++;
         }
       }
-      localStorage.setItem('CUSTOM_LOCAL_BILLS', JSON.stringify(customList));
-      return { success: true, count: updated, message: `[展示模式] 成功更新 ${updated} 筆案場名稱關聯！` };
+      for (let b of SEED_BILLS) {
+        if (b.electric_number === r.electric_number || (r.filename && b.filename === r.filename)) {
+          b.site_name = r.site_name;
+          updated++;
+        }
+      }
+    }
+    localStorage.setItem('CUSTOM_LOCAL_BILLS', JSON.stringify(customList));
+
+    if (!this.isConfigured()) {
+      return { 
+        success: true, 
+        count: records.length, 
+        message: `[展示模式] 成功識別並關聯 ${records.length} 組案場名稱（已即時更新 ${updated} 筆帳單）！` 
+      };
     }
 
-    // 更新 Supabase
+    // 更新 Supabase 雲端資料庫
     let count = 0;
     for (let r of records) {
       await supabaseInstance.from('site_mappings').upsert({
@@ -471,7 +520,11 @@ const SupabaseBillService = {
       if (!error) count++;
     }
 
-    return { success: true, count, message: `成功同步更新 Supabase 雲端資料庫中 ${count} 筆案場資料！` };
+    return { 
+      success: true, 
+      count: records.length, 
+      message: `成功同步更新 Supabase 雲端資料庫中 ${records.length} 組案場名稱對照！` 
+    };
   },
 
   async uploadPdfFile(file) {

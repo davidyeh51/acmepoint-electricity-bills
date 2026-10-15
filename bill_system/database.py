@@ -311,38 +311,59 @@ def import_dispatch_list(text: str) -> Dict[str, Any]:
     
     with get_connection() as conn:
         cursor = conn.cursor()
+        seen = set()
         for line in lines:
-            if "電號" in line and "案場" in line:
+            m_elec = re.search(r'(\d{2}-\d{2}-\d{4}-\d{2}-\d{1})', line)
+            if not m_elec:
                 continue
-            parts = re.split(r'\t+|\s{2,}', line)
-            if len(parts) >= 2:
-                elec_no = parts[0].strip()
-                site_name = parts[1].strip()
-                fname = parts[4].strip() if len(parts) > 4 else ""
-                
-                # Check valid electric number format
-                if not re.search(r'\d{2}-\d{2}-\d{4}-\d{2}-\d{1}', elec_no):
-                    # Maybe separated differently, try regex search in line
-                    m = re.search(r'(\d{2}-\d{2}-\d{4}-\d{2}-\d{1})\s+([^\s]+)', line)
-                    if m:
-                        elec_no = m.group(1).strip()
-                        site_name = m.group(2).strip()
-                    else:
-                        continue
-                        
-                # Upsert to site_mappings
+            elec_no = m_elec.group(1)
+            site_name = ""
+            fname = ""
+
+            # Pattern 1: Brackets format: [elec] site
+            m1 = re.search(r'\[\s*' + re.escape(elec_no) + r'\s*\]\s*[-—:：]?\s*([^\s\t|]+)', line)
+            if m1:
+                site_name = m1.group(1).strip()
+
+            # Pattern 2: Key-value: 案場[名稱]?[:：]?\s*([^\s]+)
+            if not site_name:
+                m2 = re.search(r'(?:案場|案場名稱)[：:]\s*([^\s,，|]+)', line)
+                if m2:
+                    site_name = m2.group(1).strip()
+
+            # Pattern 3: Delimited by tabs, pipes, or spaces
+            if not site_name:
+                cleaned = re.sub(r'^\s*(?:\d+[.)]|[-*])\s*', '', line)
+                parts = [p.strip() for p in re.split(r'[\t|]+|\s{1,}', cleaned) if p.strip()]
+                for j, p in enumerate(parts):
+                    if elec_no in p:
+                        if j + 1 < len(parts) and not re.search(r'^\d{8}$', parts[j+1]) and not parts[j+1].endswith('.pdf'):
+                            site_name = parts[j+1]
+                        elif j > 0 and not re.search(r'^\d{8}$', parts[j-1]):
+                            site_name = parts[j-1]
+                        break
+
+            # Check filename
+            m_pdf = re.search(r'([0-9a-zA-Z_\-]+\.pdf)', line, re.I)
+            if m_pdf:
+                fname = m_pdf.group(1)
+
+            if site_name:
+                site_name = re.sub(r'[\[\]()（）]', '', site_name).strip()
+
+            if elec_no and site_name and elec_no not in seen:
+                seen.add(elec_no)
                 cursor.execute("""
                     INSERT INTO site_mappings (electric_number, site_name, updated_at)
                     VALUES (?, ?, ?)
                     ON CONFLICT(electric_number) DO UPDATE SET site_name = excluded.site_name, updated_at = excluded.updated_at
                 """, (elec_no, site_name, now_iso))
-                
-                # Update existing bills
+
                 cursor.execute("""
                     UPDATE bills SET site_name = ?, updated_at = ?
                     WHERE electric_number = ? OR filename = ?
                 """, (site_name, now_iso, elec_no, fname))
-                
+
                 cnt = cursor.rowcount
                 updated_count += max(cnt, 1)
                 records.append({
@@ -351,7 +372,7 @@ def import_dispatch_list(text: str) -> Dict[str, Any]:
                     "filename": fname,
                     "matched_bills": cnt
                 })
-                
+
         conn.commit()
         
     return {
