@@ -1,0 +1,137 @@
+
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><title>
+	維運管理系統
+</title>
+
+
+    <!-- Favicons -->
+    <link href="assets/img/favicon.png" rel="icon" /><link href="assets/img/apple-touch-icon.png" rel="apple-touch-icon" />
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.gstatic.com" rel="preconnect" /><link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Nunito:300,300i,400,400i,600,600i,700,700i|Poppins:300,300i,400,400i,500,500i,600,600i,700,700i" rel="stylesheet" />
+
+    <!-- Vendor CSS Files -->
+    <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet" /><link href="assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet" /><link href="assets/vendor/boxicons/css/boxicons.min.css" rel="stylesheet" /><link href="assets/vendor/quill/quill.snow.css" rel="stylesheet" /><link href="assets/vendor/quill/quill.bubble.css" rel="stylesheet" /><link href="assets/vendor/remixicon/remixicon.css" rel="stylesheet" /><link href="assets/vendor/simple-datatables/style.css" rel="stylesheet" />
+    <script src='/acme_mow/vendor/jquery/jquery.min.js'></script>
+    <!-- Template Main CSS File -->
+    <link href="assets/css/style.css" rel="stylesheet" />
+    <script>
+        function refresh驗證碼() {
+            var img = document.getElementById("img驗證碼");
+            img.src = "ADLogin_Verification.aspx?ts=" + new Date().getTime();
+        }
+
+        function img_url(url) {
+            document.getElementById('img_驗證碼').src = url;
+        }
+    </script>
+    <style>
+        #UpdatePanel3 {
+            background-color: #e5edfb;
+        }
+    </style>
+</head>
+<body><a href="https://ds.acmepointes.net/cdn-cgi/content?id=eA.E07ofG.PRTpdMqe1ivay0irsMdJm7UzpMrNnwnXU-1792397599.1290307-1.2.1.1-178XdjWZ_9dD9.tAXxgMFSWhPGXWWzEwi7Ajr6lzbnyR6VkLBiHBFl6PxxaDk3W2" aria-hidden="true" rel="nofollow noopener" style="display: none !important; visibility: hidden !important"></a>
+    <form method="post" action="./ADLogin" id="form1">
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="p5pe6DL5iwkMyN34v/FDl7o7DOEob3JA0i9gXvCbq6R7EpCAeqDxN5kL/SDrfu1z0GvMBz3L2ExuoMke49KR1qvGhWsRKPgQC15gz9dgj5jTnZUTwbewl4UnsdJmYqER5WNZ+sXi2ldT3LKLZdCvlOdBwuIp/lsVh9dsd46DhJ4=" />
+
+
+<script src="Scripts/WebForms/MsAjax/MicrosoftAjax.js" type="text/javascript"></script>
+<script type="text/javascript">
+//<![CDATA[
+if (typeof(Sys) === 'undefined') throw new Error('ASP.NET Ajax 用戶端架構無法載入。');
+//]]>
+</script>
+
+<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="E929BD95" />
+<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="rMSAL3MY+Iucnqy8aUQwaLK/L3KGSxDuomW3cRx6eJCaZOCSxe5hsUkaT7+KasCw5EilQnYgHYUEcrWoadAfoOkcuuI8uryQIRpKUkVBa+FHbnWI96GcKBVcFGysx+HC/DbcEeJ4ejfrHeKIpmpS22pAD089BnuXTAB6IBGo5gKnqPjKqxR8Z0c45rRM00VslZdNZlvfbHXobD54xSuA0g==" />
+        <input type="hidden" name="ScriptManager1" id="ScriptManager1" />
+<script type="text/javascript">
+//<![CDATA[
+Sys.Application.setServerId("ScriptManager1", "ScriptManager1");
+Sys.Application._enableHistoryInScriptManager();
+//]]>
+</script>
+
+        <div id="UpdatePanel3">
+	
+                <div class="container">
+
+                    <section class="section register min-vh-100 d-flex flex-column align-items-center justify-content-center py-4">
+                        <div class="container">
+                            <div class="row justify-content-center">
+                                <div class="col-lg-4 col-md-6 d-flex flex-column align-items-center justify-content-center">
+
+                                    
+                                    <!-- End Logo -->
+
+                                    <div class="card mb-3 ">
+
+                                        <div class="card-body">
+
+                                            <div class="pt-4">
+                                                <h5 class="card-title text-center pb-0 fs-4">維運管理系統</h5>
+                                                
+                                            </div>
+                                            <hr class="mb-4" />
+                                            <div class="row g-3 needs-validation">
+
+                                                <div class="col-12 mb-2">
+                                                    <div class="input-group has-validation">
+                                                        <input name="txt帳號" type="text" id="txt帳號" class="form-control" placeholder="使用者帳號" />
+                                                    </div>
+                                                </div>
+                                                <div class="col-12 mb-2">
+                                                    <div class="input-group has-validation">
+                                                        <input name="txt密碼" id="txt密碼" class="form-control" type="password" placeholder="使用者密碼" />
+                                                    </div>
+                                                </div>
+                                                <div class="col-12 mb-2">
+                                                    <div class="input-group has-validation">
+                                                        <input name="txtTXM" id="txtTXM" class="form-control" placeholder="驗證碼" inputmode="numeric" type="tel" />
+                                                        <img id="img驗證碼" src="ADLogin_Verification.aspx" alt="驗證碼圖片" onclick="this.src='ADLogin_Verification.aspx?ts=' + new Date().getTime();" style="cursor: pointer;">
+                                                        <a onclick="refresh驗證碼(); return false;" id="LinkButton1" class="input-group-text" href="javascript:__doPostBack(&#39;LinkButton1&#39;,&#39;&#39;)">
+            <i class="bi bi-arrow-clockwise" style="margin: auto;"></i>
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                                <div class="col-12 mb-4">
+                                                    <input type="submit" name="Button1" value="登入" id="Button1" class="btn btn-primary w-100" />
+                                                </div>
+
+                                            </div>
+
+                                        </div>
+                                    </div>
+
+
+
+                                </div>
+                            </div>
+                        </div>
+
+                    </section>
+
+                </div>
+
+            
+</div>
+    </form>
+    <!-- Vendor JS Files -->
+    <script src='/acme_mow/assets/vendor/apexcharts/apexcharts.min.js'></script>
+    <script src='/acme_mow/assets/vendor/bootstrap/js/bootstrap.bundle.min.js'></script>
+    <script src='/acme_mow/assets/vendor/chart.js/chart.umd.js'></script>
+    <script src='/acme_mow/assets/vendor/echarts/echarts.min.js'></script>
+    <script src='/acme_mow/assets/vendor/quill/quill.min.js'></script>
+    <script src='/acme_mow/assets/vendor/simple-datatables/simple-datatables.js'></script>
+    <script src='/acme_mow/assets/vendor/tinymce/tinymce.min.js'></script>
+    <script src='/acme_mow/assets/vendor/php-email-form/validate.js'></script>
+
+    <!-- Template Main JS File -->
+    <script src='/acme_mow/assets/js/main.js'></script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4ce52a28eebfa86',t:'MTc5MjM5NzU5OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
