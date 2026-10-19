@@ -296,9 +296,27 @@ const SupabaseBillService = {
           updated_at: new Date().toISOString()
         };
 
+        // 讀取既有記錄並進行智慧合併，嚴格防護避免解析不完全的空值蓋掉雲端已有數值
+        let finalPayload = { ...payload };
+        const { data: existingRow } = await supabaseInstance
+          .from('electricity_bills')
+          .select('*')
+          .eq('filename', billData.filename)
+          .maybeSingle();
+
+        if (existingRow) {
+          finalPayload = { ...existingRow };
+          for (const [k, v] of Object.entries(payload)) {
+            if (v !== null && v !== undefined && v !== '') {
+              finalPayload[k] = v;
+            }
+          }
+        }
+        finalPayload.updated_at = new Date().toISOString();
+
         const { error } = await supabaseInstance
           .from('electricity_bills')
-          .upsert(payload, { onConflict: 'filename' });
+          .upsert(finalPayload, { onConflict: 'filename' });
 
         if (!error) {
           billData.synced_to_cloud = true;
@@ -640,9 +658,27 @@ const SupabaseBillService = {
           updated_at: new Date().toISOString()
         };
 
+        // 讀取既有記錄並進行智慧合併，嚴格防護避免解析不完全的空值蓋掉雲端已有數值
+        let finalPayload = { ...payload };
+        const { data: existingRow } = await supabaseInstance
+          .from('electricity_bills')
+          .select('*')
+          .eq('filename', b.filename)
+          .maybeSingle();
+
+        if (existingRow) {
+          finalPayload = { ...existingRow };
+          for (const [k, v] of Object.entries(payload)) {
+            if (v !== null && v !== undefined && v !== '') {
+              finalPayload[k] = v;
+            }
+          }
+        }
+        finalPayload.updated_at = new Date().toISOString();
+
         const { error } = await supabaseInstance
           .from('electricity_bills')
-          .upsert(payload, { onConflict: 'filename' });
+          .upsert(finalPayload, { onConflict: 'filename' });
 
         if (!error) {
           b.synced_to_cloud = true;
@@ -672,6 +708,33 @@ const SupabaseBillService = {
     }
 
     return { success: true, syncedCount };
+  },
+
+  // 更新特定電費單資料（支援線上預覽核對時直接修改保存）
+  async updateBill(id, fields) {
+    if (!id) return;
+
+    // 1. 更新本機 LocalStorage
+    const localList = this.getLocalBills();
+    const idx = localList.findIndex(b => b.id == id);
+    if (idx >= 0) {
+      localList[idx] = { ...localList[idx], ...fields, updated_at: new Date().toISOString() };
+      localStorage.setItem('CUSTOM_LOCAL_BILLS', JSON.stringify(localList));
+    }
+
+    // 2. 更新 Supabase 雲端
+    if (this.isConfigured() && supabaseInstance) {
+      try {
+        const payload = { ...fields, updated_at: new Date().toISOString() };
+        const { error } = await supabaseInstance
+          .from('electricity_bills')
+          .update(payload)
+          .eq('id', id);
+        if (error) console.warn("Supabase updateBill warning:", error);
+      } catch (err) {
+        console.error("Supabase updateBill error:", err);
+      }
+    }
   },
 
   // 產生一鍵分享連結（附帶已設定之 Supabase 憑證，供團隊無痛連線）
