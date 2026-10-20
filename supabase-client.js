@@ -572,8 +572,9 @@ const SupabaseBillService = {
     }
 
     const rawName = (fileOrBlob && fileOrBlob.name) || customFilename || 'bill.pdf';
-    const cleanName = rawName.replace(/[^a-zA-Z0-9_\u4e00-\u9fa5.-]/g, '_');
-    const storagePath = `bills/${Date.now()}_${cleanName}`;
+    // Supabase / S3 物件鍵僅支援純 ASCII 字元，過濾非英數符號避免 InvalidKey 錯誤
+    const baseAscii = rawName.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 30);
+    const storagePath = `bills/${Date.now()}_${baseAscii || 'bill'}.pdf`;
 
     try {
       const { data, error } = await supabaseInstance.storage
