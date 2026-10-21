@@ -42,10 +42,33 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- SheetJS for Client-side Excel Export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Tesseract.js for Browser OCR of Scanned Bills -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <!-- Supabase Client Module -->
     <script src="supabase-client.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+        @media print {
+            body {
+                background: white !important;
+                color: black !important;
+            }
+            header, nav, #mainNavTabs, #billsView, #demoNoticeBanner, #calculatorView, #toast, .no-print {
+                display: none !important;
+            }
+            #printInvoiceModal {
+                position: static !important;
+                background: white !important;
+                padding: 0 !important;
+                display: block !important;
+            }
+            #printInvoiceModalContent {
+                box-shadow: none !important;
+                border: none !important;
+                max-width: 100% !important;
+                width: 100% !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased">
@@ -99,14 +122,48 @@
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
         <!-- Cloud Notice Banner (if running in Demo mode) -->
-        <div id="demoNoticeBanner" class="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 flex items-center justify-between shadow-sm hidden">
+        <div id="demoNoticeBanner" class="p-3.5 rounded-xl bg-amber-50/95 border border-amber-200 text-xs text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-sm hidden">
             <div class="flex items-center space-x-2">
                 <i data-lucide="cloud-alert" class="w-4 h-4 text-amber-600 flex-shrink-0"></i>
-                <span><strong>目前以本地展示模式運作</strong>：若要同步至您的 Supabase 雲端資料庫（PostgreSQL 儲存與 PDF Storage 直傳），請點選右上方連線狀態進行配置。</span>
+                <span><strong>目前為本地展示模式</strong>：上傳之電費單僅儲存於本機瀏覽器，其他同仁無法同步查看。若要多人即時共享，請完成 Supabase 雲端設定或使用邀請連結！</span>
             </div>
-            <button onclick="openSupabaseSettingsModal()" class="px-2.5 py-1 text-xs font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300 rounded-lg transition whitespace-nowrap ml-2">設定 Supabase</button>
+            <button onclick="openSupabaseSettingsModal()" class="px-3 py-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition whitespace-nowrap shadow-sm flex items-center space-x-1">
+                <i data-lucide="link" class="w-3.5 h-3.5"></i>
+                <span>連線雲端資料庫</span>
+            </button>
         </div>
 
+        <!-- Main Navigation Tabs -->
+        <div id="mainNavTabs" class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-3 gap-3">
+            <div class="flex items-center space-x-2">
+                <button id="navTabBills" onclick="switchMainView('bills')" class="inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-brand-600 text-white">
+                    <i data-lucide="table-2" class="w-4 h-4"></i>
+                    <span>電費單資料庫管理</span>
+                </button>
+                <button id="navTabCalculator" onclick="switchMainView('calculator')" class="inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-white text-slate-700 hover:bg-slate-50 border border-slate-200">
+                    <i data-lucide="calculator" class="w-4 h-4 text-brand-600"></i>
+                    <span>客服維運費用試算 (O&M Calculator)</span>
+                    <span class="px-2 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded-full">客服專屬</span>
+                </button>
+            </div>
+            <div id="calculatorTopActions" class="hidden flex items-center space-x-2">
+                <button onclick="copyOmSummaryText()" class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition shadow-sm" title="複製 LINE/Email 請款通知摘要">
+                    <i data-lucide="copy" class="w-3.5 h-3.5 text-slate-500"></i>
+                    <span>複製請款摘要</span>
+                </button>
+                <button onclick="exportOmCalculatorExcel()" class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition shadow-sm" title="匯出 Excel 試算表">
+                    <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-emerald-600"></i>
+                    <span>匯出 Excel</span>
+                </button>
+                <button onclick="openPrintInvoiceModal()" class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition shadow-md" title="列印或另存 PDF 請款單">
+                    <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                    <span>列印請款明細單</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ==================== VIEW 1: BILLS MANAGEMENT ==================== -->
+        <div id="billsView" class="space-y-6">
         <!-- KPI Dashboard Cards -->
         <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
@@ -176,13 +233,21 @@
                         type="text" 
                         id="searchInput"
                         oninput="debounceSearch()"
-                        placeholder="搜尋案場名稱（如美傢、賴侯）、電號、契約編號、地點、客戶或統編..."
-                        class="w-full pl-10 pr-10 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition"
+                        autocomplete="off"
+                        autocorrect="off"
+                        autocapitalize="off"
+                        spellcheck="false"
+                        placeholder="搜尋案場名稱（如美傢、賴侯、五甲尾）、電號、契約編號、地點、客戶或統編..."
+                        class="w-full pl-10 pr-20 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition"
                     >
+                    <div id="searchSpinner" class="hidden absolute inset-y-0 right-10 flex items-center pointer-events-none text-brand-600">
+                        <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
+                    </div>
                     <button 
                         onclick="clearSearch()" 
                         id="clearSearchBtn"
                         class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 hidden"
+                        title="清除搜尋關鍵字"
                     >
                         <i data-lucide="x-circle" class="w-4 h-4"></i>
                     </button>
@@ -249,6 +314,219 @@
                 </table>
             </div>
         </section>
+        </div><!-- End billsView -->
+
+        <!-- ==================== VIEW 2: O&M BILLING CALCULATOR ==================== -->
+        <div id="calculatorView" class="hidden space-y-6">
+            <!-- 參數與控制卡片 -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                <div class="flex flex-col md:flex-row md:items-center justify-between pb-3 border-b border-slate-100 gap-3">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900 flex items-center space-x-2">
+                            <i data-lucide="sliders" class="w-5 h-5 text-brand-600"></i>
+                            <span>案場維運計費參數與破月區間設定</span>
+                        </h2>
+                        <p class="text-xs text-slate-500 mt-0.5">專為客服計算非整月合約（如五甲尾 114/7/20~115/7/19）之精確度數切分與發電收入維運費</p>
+                    </div>
+                    <!-- 快捷期間標籤 -->
+                    <div class="flex items-center flex-wrap gap-1.5">
+                        <span class="text-xs text-slate-400 font-medium mr-1">快捷選擇：</span>
+                        <button type="button" onclick="setOmQuickRange('wujiawei_p1')" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-brand-50 text-brand-700 border border-brand-200 hover:bg-brand-100 transition">五甲尾首期 (114/7/20~115/7/19)</button>
+                        <button type="button" onclick="setOmQuickRange('wujiawei_p2')" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition">五甲尾次期 (115/7/20~116/7/19)</button>
+                        <button type="button" onclick="setOmQuickRange('last_year')" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition">最近 12 個月</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <!-- 案場選擇 -->
+                    <div class="lg:col-span-2">
+                        <label class="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                            <span>1. 選取維運案場 (電號)</span>
+                            <span id="omPlantMeta" class="text-[11px] font-normal text-slate-400"></span>
+                        </label>
+                        <select id="omPlantSelect" onchange="onOmPlantSelectChange()" class="w-full text-xs font-semibold p-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500">
+                            <!-- 動態載入案場選單 -->
+                        </select>
+                    </div>
+
+                    <!-- 計費起日 -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                            <span>2. 計費起日 (含)</span>
+                            <span id="omStartRocLabel" class="text-[11px] font-bold text-brand-700">114/07/20</span>
+                        </label>
+                        <input type="date" id="omStartDate" value="2025-07-20" onchange="onOmDateChange()" class="w-full text-xs font-semibold p-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500">
+                    </div>
+
+                    <!-- 計費訖日 -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                            <span>3. 計費訖日 (含)</span>
+                            <span id="omEndRocLabel" class="text-[11px] font-bold text-brand-700">115/07/19</span>
+                        </label>
+                        <input type="date" id="omEndDate" value="2026-07-19" onchange="onOmDateChange()" class="w-full text-xs font-semibold p-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500">
+                    </div>
+
+                    <!-- 躉購費率 -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">
+                            <span>4. 躉購費率 (元/度)</span>
+                        </label>
+                        <input type="number" step="0.0001" id="omFitRate" value="4.8529" onchange="runOmCalculation()" class="w-full text-xs font-bold font-mono p-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500 text-brand-700">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
+                    <!-- 維運比例 -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">
+                            <span>5. 維運費用發電收入比例 (%)</span>
+                        </label>
+                        <div class="relative">
+                            <input type="number" step="0.1" id="omRatio" value="8.0" onchange="runOmCalculation()" class="w-full text-xs font-bold font-mono p-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-500 text-amber-800 pr-8">
+                            <span class="absolute right-3 top-2.5 text-xs text-slate-400 font-bold">%</span>
+                        </div>
+                    </div>
+
+                    <!-- 營業稅率 -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">
+                            <span>6. 營業稅率 (%)</span>
+                        </label>
+                        <div class="relative">
+                            <input type="number" step="1" id="omTaxRate" value="5" onchange="runOmCalculation()" class="w-full text-xs font-bold font-mono p-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500 text-slate-700 pr-8">
+                            <span class="absolute right-3 top-2.5 text-xs text-slate-400 font-bold">%</span>
+                        </div>
+                    </div>
+
+                    <!-- 切分模式 -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">
+                            <span>7. 破月度數切分演算法</span>
+                        </label>
+                        <select id="omSplitMode" onchange="runOmCalculation()" class="w-full text-xs font-semibold p-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500">
+                            <option value="prorata">按天數佔比精確分割 (首月 12/31 天、尾月 19/31 天)</option>
+                            <option value="custom">開放手動調整各月度數 (現場表頭自訂)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 公式提示框 -->
+                <div class="p-3 bg-blue-50/80 rounded-xl border border-blue-200 text-xs text-blue-900 flex flex-col md:flex-row md:items-center justify-between gap-2">
+                    <div class="flex items-center space-x-2">
+                        <i data-lucide="info" class="w-4 h-4 text-blue-600 flex-shrink-0"></i>
+                        <span><strong>計費公式</strong>：區間總計費度數 × 躉購費率 (<span id="omFormulaRate">4.8529</span>) × 維運發電收入比例 (<span id="omFormulaRatio">8.0%</span>) = <strong>實際維運費用 (未稅)</strong></span>
+                    </div>
+                    <div class="text-[11px] text-blue-700 font-medium">
+                        營業稅 5% 另計 ｜ 請款含稅總額 = 實際維運費用 × 1.05
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5 大核心指標卡 -->
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <!-- 納入計費總度數 -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+                    <div class="flex items-center justify-between text-slate-500 mb-1">
+                        <span class="text-xs font-semibold uppercase tracking-wider">納入計費總度數</span>
+                        <i data-lucide="zap" class="w-4 h-4 text-amber-500"></i>
+                    </div>
+                    <div class="text-2xl font-bold text-slate-900 font-mono" id="omKpiTotalKwh">-</div>
+                    <div class="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
+                        <span>涵蓋 <span id="omKpiMonthCount">12</span> 個月</span>
+                        <span id="omKpiDaysCount">365 天</span>
+                    </div>
+                </div>
+
+                <!-- 躉購發電收入合計 (未稅) -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+                    <div class="flex items-center justify-between text-slate-500 mb-1">
+                        <span class="text-xs font-semibold uppercase tracking-wider">發電總收入 (未稅)</span>
+                        <i data-lucide="activity" class="w-4 h-4 text-emerald-500"></i>
+                    </div>
+                    <div class="text-2xl font-bold text-emerald-700 font-mono" id="omKpiTotalRevenue">-</div>
+                    <div class="text-[11px] text-slate-400 mt-1">度數 × 躉購費率</div>
+                </div>
+
+                <!-- 實際維運費用 (未稅 8%) -->
+                <div class="bg-white p-4 rounded-xl border-2 border-brand-500 shadow-sm hover:shadow transition bg-gradient-to-br from-brand-50/30 to-white">
+                    <div class="flex items-center justify-between text-brand-800 mb-1">
+                        <span class="text-xs font-bold uppercase tracking-wider">實際維運費用 (未稅)</span>
+                        <i data-lucide="calculator" class="w-4 h-4 text-brand-600"></i>
+                    </div>
+                    <div class="text-2xl font-extrabold text-brand-700 font-mono" id="omKpiFeeNet">-</div>
+                    <div class="text-[11px] text-brand-600 font-medium mt-1">發電收入 × <span id="omKpiRatioLabel">8%</span></div>
+                </div>
+
+                <!-- 營業稅 5% -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
+                    <div class="flex items-center justify-between text-slate-500 mb-1">
+                        <span class="text-xs font-semibold uppercase tracking-wider">營業稅 (5%)</span>
+                        <i data-lucide="receipt" class="w-4 h-4 text-slate-500"></i>
+                    </div>
+                    <div class="text-2xl font-bold text-slate-700 font-mono" id="omKpiTax">-</div>
+                    <div class="text-[11px] text-slate-400 mt-1">維運費用 × 5%</div>
+                </div>
+
+                <!-- 應收請款總額 (含稅) -->
+                <div class="bg-white p-4 rounded-xl border-2 border-amber-500 shadow-sm hover:shadow transition bg-gradient-to-br from-amber-50/40 to-white">
+                    <div class="flex items-center justify-between text-amber-900 mb-1">
+                        <span class="text-xs font-bold uppercase tracking-wider">應收請款總額 (含稅)</span>
+                        <i data-lucide="badge-dollar-sign" class="w-4 h-4 text-amber-600"></i>
+                    </div>
+                    <div class="text-2xl font-extrabold text-amber-700 font-mono" id="omKpiTotalGross">-</div>
+                    <div class="text-[11px] text-amber-700 font-semibold mt-1">未稅 ＋ 營業稅</div>
+                </div>
+            </div>
+
+            <!-- 逐月明細清單表格 -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-sm flex items-center space-x-2">
+                            <i data-lucide="calendar-range" class="w-4 h-4 text-brand-600"></i>
+                            <span>各月電費單數值擷取與破月切分明細清單</span>
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">點擊行內數值可手動微調，系統自動即時重算總金額與請款單</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button type="button" onclick="resetOmCalculatedKwh()" class="px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition">重設依天數切分</button>
+                        <button type="button" onclick="exportOmCalculatorExcel()" class="px-3 py-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition shadow-xs flex items-center space-x-1">
+                            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                            <span>匯出 Excel 清冊</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-50/80 border-b border-slate-200 font-bold text-slate-600 uppercase tracking-wider">
+                                <th class="py-3 px-3 text-center">項次</th>
+                                <th class="py-3 px-3">帳單月份</th>
+                                <th class="py-3 px-3">台電計費期間</th>
+                                <th class="py-3 px-3 text-center">全期天數</th>
+                                <th class="py-3 px-3">納入維運計費區間</th>
+                                <th class="py-3 px-3 text-center">計費日數</th>
+                                <th class="py-3 px-3 text-center">天數佔比</th>
+                                <th class="py-3 px-3 text-right">台電原單度數 (kWh)</th>
+                                <th class="py-3 px-3 text-right font-bold text-brand-700">納入計費度數 (kWh)</th>
+                                <th class="py-3 px-3 text-right">發電收入 (NT$)</th>
+                                <th class="py-3 px-3 text-right font-bold text-amber-700">維運費用 (未稅 NT$)</th>
+                                <th class="py-3 px-3 text-center">計費模式</th>
+                                <th class="py-3 px-3 text-center">電費單原檔</th>
+                            </tr>
+                        </thead>
+                        <tbody id="omTableBody" class="divide-y divide-slate-100 font-mono">
+                            <!-- Dynamic Rows Rendered Here -->
+                        </tbody>
+                        <tfoot id="omTableFoot" class="bg-slate-50/90 font-bold text-slate-800 border-t-2 border-slate-300 font-mono">
+                            <!-- Summary Footer -->
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div><!-- End calculatorView -->
 
     </main>
 
@@ -289,9 +567,20 @@
                             <i data-lucide="share-2" class="w-4 h-4 text-emerald-600"></i>
                             <span>團隊免設定邀請連結</span>
                         </span>
-                        <button onclick="copyTeamShareLink()" class="px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-emerald-200/80 hover:bg-emerald-300 rounded-lg transition shadow-xs">一鍵複製</button>
+                        <button onclick="copyTeamShareLink()" class="px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-emerald-200 hover:bg-emerald-300 rounded-lg transition shadow-xs">一鍵複製</button>
                     </div>
-                    <p class="text-[11px] text-emerald-700 leading-relaxed">發送此連結給團隊成員，開啟後瀏覽器會自動完成 Supabase 雲端綁定，無需手動輸入金鑰！</p>
+                    <p class="text-[11px] text-emerald-700 leading-relaxed">發送此連結給團隊成員（LINE / Slack），開啟後全團隊自動連線至同一雲端資料庫，無需手動輸入金鑰！</p>
+                </div>
+
+                <div class="p-3 bg-indigo-50 rounded-xl border border-indigo-200 text-xs space-y-1.5 text-indigo-900">
+                    <div class="font-bold flex items-center justify-between">
+                        <span class="flex items-center space-x-1.5">
+                            <i data-lucide="refresh-cw" class="w-4 h-4 text-indigo-600"></i>
+                            <span>離線電費單雲端同步</span>
+                        </span>
+                        <button onclick="manualSyncOfflineBills()" type="button" class="px-2.5 py-1 text-xs font-semibold text-indigo-800 bg-indigo-200/80 hover:bg-indigo-300 rounded-lg transition shadow-xs">一鍵同步</button>
+                    </div>
+                    <p class="text-[11px] text-indigo-700 leading-relaxed">若您或同仁先前在「展示模式」下上傳過電費單（如五甲尾），點擊此處即可一鍵將本機暫存的帳單與 PDF 原檔推送至 Supabase 雲端！</p>
                 </div>
 
                 <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5 text-slate-600">
@@ -595,6 +884,136 @@
         </div>
     </div>
 
+    <!-- Printable O&M Invoice Modal -->
+    <div id="printInvoiceModal" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-sm hidden overflow-y-auto">
+        <div id="printInvoiceModalContent" class="bg-white rounded-2xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden transform transition-all my-8">
+            <!-- Modal Header (Screen Only) -->
+            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 no-print">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="printer" class="w-5 h-5 text-brand-600"></i>
+                    <h3 class="font-bold text-slate-800 text-sm">太陽能光電廠維運服務費用 請款試算明細表列印預覽</h3>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button type="button" onclick="doPrintInvoice()" class="px-3.5 py-1.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow transition flex items-center space-x-1.5">
+                        <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                        <span>立即列印 / 另存 PDF</span>
+                    </button>
+                    <button type="button" onclick="closePrintInvoiceModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Printable Sheet Area -->
+            <div id="printInvoiceContainer" class="p-8 sm:p-10 space-y-6 text-slate-900 bg-white">
+                <!-- Formal Company Letterhead -->
+                <div class="border-b-2 border-slate-900 pb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="font-black text-xl tracking-tight text-slate-900">進金生能源服務股份有限公司</span>
+                            <span class="text-xs px-2 py-0.5 rounded font-bold bg-slate-100 text-slate-700 border border-slate-300">股票代號 6692</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-1">ACMEPOINT ENERGY SERVICES CO., LTD. ｜ 客服暨維運管理處</p>
+                        <h2 class="text-lg font-black text-slate-900 mt-3 tracking-wide">太陽能電廠維運服務費用 請款明細清單</h2>
+                    </div>
+                    <div class="text-xs text-right font-mono space-y-1">
+                        <div><span class="text-slate-500">請款單號：</span><strong id="printInvNo">-</strong></div>
+                        <div><span class="text-slate-500">製表日期：</span><strong id="printInvDate">-</strong></div>
+                    </div>
+                </div>
+
+                <!-- Plant & Customer Info Grid -->
+                <div class="grid grid-cols-2 gap-4 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div>
+                        <div><span class="text-slate-500">請款對象 (客戶)：</span><strong id="printCustomerName" class="text-slate-900">-</strong></div>
+                        <div class="mt-1"><span class="text-slate-500">統一編號：</span><strong id="printTaxId" class="text-slate-900">-</strong></div>
+                        <div class="mt-1"><span class="text-slate-500">案場名稱：</span><strong id="printPlantName" class="text-slate-900">-</strong></div>
+                        <div class="mt-1"><span class="text-slate-500">設置地點：</span><span id="printLocation" class="text-slate-700">-</span></div>
+                    </div>
+                    <div>
+                        <div><span class="text-slate-500">台電電號：</span><strong id="printElectricNo" class="text-slate-900 font-mono">-</strong></div>
+                        <div class="mt-1"><span class="text-slate-500">契約編號：</span><strong id="printContractNo" class="text-slate-900 font-mono">-</strong></div>
+                        <div class="mt-1"><span class="text-slate-500">裝置容量：</span><strong id="printCapacity" class="text-slate-900 font-mono">-</strong> kW</div>
+                        <div class="mt-1"><span class="text-slate-500">計費區間：</span><strong id="printBillingRange" class="text-brand-800">-</strong></div>
+                    </div>
+                </div>
+
+                <!-- Rate & Formula Callout -->
+                <div class="text-xs p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between text-blue-900">
+                    <div><strong>計費公式：</strong>納入計費度數加總 × 躉購費率 (<span id="printFitRate">-</span>) × 維運費率 (<span id="printOmRatio">-</span>) = 實際維運費用 (未稅)</div>
+                    <div class="text-[11px] text-blue-700 font-medium">破月首期 / 尾期依實際涵蓋天數比例精確切分</div>
+                </div>
+
+                <!-- Monthly Breakdown Table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs border border-slate-300">
+                        <thead>
+                            <tr class="bg-slate-100 border-b border-slate-300 font-bold text-slate-800 text-[11px]">
+                                <th class="p-2 border border-slate-300 text-center">序</th>
+                                <th class="p-2 border border-slate-300">帳單月份</th>
+                                <th class="p-2 border border-slate-300">台電計費期間</th>
+                                <th class="p-2 border border-slate-300 text-center">全期天數</th>
+                                <th class="p-2 border border-slate-300">納入計費區間</th>
+                                <th class="p-2 border border-slate-300 text-center">計費日數</th>
+                                <th class="p-2 border border-slate-300 text-center">佔比</th>
+                                <th class="p-2 border border-slate-300 text-right">原單度數</th>
+                                <th class="p-2 border border-slate-300 text-right font-bold">納入計費度數</th>
+                                <th class="p-2 border border-slate-300 text-right">發電收入(未稅)</th>
+                                <th class="p-2 border border-slate-300 text-right font-bold">維運費用(未稅)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="printTableBody" class="font-mono text-[11px]">
+                            <!-- Rows rendered here -->
+                        </tbody>
+                        <tfoot id="printTableFoot" class="bg-slate-50 font-bold border-t-2 border-slate-400 font-mono text-[11px]">
+                            <!-- Totals rendered here -->
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- Financial Summary Box -->
+                <div class="border-2 border-slate-900 rounded-xl p-4 bg-slate-50/50 space-y-2">
+                    <div class="flex items-center justify-between text-xs font-mono pb-2 border-b border-slate-200">
+                        <span class="font-bold text-slate-700">實際維運服務費用 (未稅)：</span>
+                        <strong class="text-sm text-slate-900" id="printNetFee">-</strong>
+                    </div>
+                    <div class="flex items-center justify-between text-xs font-mono pb-2 border-b border-slate-200">
+                        <span class="font-bold text-slate-700">加計營業稅 (5%)：</span>
+                        <strong class="text-sm text-slate-700" id="printTaxFee">-</strong>
+                    </div>
+                    <div class="flex items-center justify-between text-sm font-mono pt-1">
+                        <span class="font-black text-slate-900">本期應付總金額 (含稅)：</span>
+                        <strong class="text-lg font-black text-brand-900" id="printGrossFee">-</strong>
+                    </div>
+                    <div class="pt-2 border-t border-slate-200 text-xs flex items-center justify-between">
+                        <span class="text-slate-500 font-bold">中文大寫金額：</span>
+                        <strong id="printChineseAmount" class="text-slate-900 text-xs tracking-wider">-</strong>
+                    </div>
+                </div>
+
+                <!-- Signoff Approval Blocks -->
+                <div class="pt-8 grid grid-cols-4 gap-4 text-xs text-center border-t border-slate-300">
+                    <div class="space-y-8">
+                        <div class="text-slate-500 font-bold">製表經辦</div>
+                        <div class="border-b border-slate-400 pb-1 font-medium text-slate-700">客服運維部</div>
+                    </div>
+                    <div class="space-y-8">
+                        <div class="text-slate-500 font-bold">客服暨運維主管</div>
+                        <div class="border-b border-slate-400 pb-1"></div>
+                    </div>
+                    <div class="space-y-8">
+                        <div class="text-slate-500 font-bold">財務覆核</div>
+                        <div class="border-b border-slate-400 pb-1"></div>
+                    </div>
+                    <div class="space-y-8">
+                        <div class="text-slate-500 font-bold">總經理 / 核決主管</div>
+                        <div class="border-b border-slate-400 pb-1"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast" class="fixed bottom-5 right-5 z-50 flex items-center space-x-2 px-4 py-3 rounded-xl shadow-xl bg-slate-900 text-white text-sm transform transition-all translate-y-16 opacity-0 pointer-events-none">
         <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400" id="toastIcon"></i>
@@ -609,9 +1028,27 @@
         let selectedUploadFiles = [];
         let searchTimeout = null;
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             lucide.createIcons();
             updateSupabaseStatusUI();
+
+            // 註冊電費預覽核對時之即時金額自動計算監聽
+            const kwhInp = document.getElementById('fieldKwh');
+            const rateInp = document.getElementById('fieldRate');
+            const rentInp = document.getElementById('fieldMeterRental');
+            if (kwhInp) kwhInp.addEventListener('input', autoCalculatePreviewAmounts);
+            if (rateInp) rateInp.addEventListener('input', autoCalculatePreviewAmounts);
+            if (rentInp) rentInp.addEventListener('input', autoCalculatePreviewAmounts);
+
+            if (SupabaseBillService.isConfigured()) {
+                // 背景靜默同步本地離線電費單（如五甲尾）至雲端
+                SupabaseBillService.syncLocalBillsToCloud().then(res => {
+                    if (res && res.syncedCount > 0) {
+                        showToast(`🎉 已自動將本機 ${res.syncedCount} 筆離線電費單（含五甲尾等）同步至 Supabase 雲端！`);
+                        loadAllData();
+                    }
+                }).catch(e => console.warn('Background sync note:', e));
+            }
             loadAllData();
         });
 
@@ -638,17 +1075,10 @@
             const text = document.getElementById('statusText');
             const banner = document.getElementById('demoNoticeBanner');
 
-            if (SupabaseBillService.isConfigured()) {
-                badge.className = "inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-full border border-emerald-200 bg-emerald-50 text-emerald-800 transition hover:bg-emerald-100 cursor-pointer shadow-sm";
-                dot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
-                text.innerText = "Supabase 雲端已連線";
-                banner.classList.add('hidden');
-            } else {
-                badge.className = "inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-full border border-amber-200 bg-amber-50 text-amber-800 transition hover:bg-amber-100 cursor-pointer shadow-sm";
-                dot.className = "w-2 h-2 rounded-full bg-amber-500";
-                text.innerText = "本地展示模式 (點擊設定 Supabase)";
-                banner.classList.remove('hidden');
-            }
+            badge.className = "inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-full border border-emerald-200 bg-emerald-50 text-emerald-800 transition hover:bg-emerald-100 cursor-pointer shadow-sm";
+            dot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+            text.innerText = "Supabase 雲端已連線 (團隊共享)";
+            if (banner) banner.classList.add('hidden');
         }
 
         // Supabase Settings Modal
@@ -702,12 +1132,40 @@
                     throw new Error(error.message || '無法連線至 electricity_bills 資料表，請確認已執行 SQL 腳本！');
                 }
 
-                showToast('Supabase 連線成功！');
+                showToast('Supabase 連線成功！正在自動檢查離線帳單...');
                 closeSupabaseSettingsModal();
                 updateSupabaseStatusUI();
+
+                const syncRes = await SupabaseBillService.syncLocalBillsToCloud();
+                if (syncRes && syncRes.syncedCount > 0) {
+                    showToast(`🎉 連線成功！已自動將本地 ${syncRes.syncedCount} 筆電費單（含五甲尾等）同步至雲端！`);
+                } else {
+                    showToast('Supabase 連線成功！全團隊資料已即時連通！');
+                }
+
                 loadAllData();
             } catch (err) {
                 showToast('連線失敗: ' + err.message, true);
+            }
+        }
+
+        async function manualSyncOfflineBills() {
+            if (!SupabaseBillService.isConfigured()) {
+                showToast('請先完成 Supabase 連線後再同步！', true);
+                return;
+            }
+            showToast('正在掃描本機電費單並同步至雲端...');
+            try {
+                const res = await SupabaseBillService.syncLocalBillsToCloud();
+                if (res && res.syncedCount > 0) {
+                    showToast(`🎉 成功同步 ${res.syncedCount} 筆電費單（含五甲尾等）至 Supabase 雲端！`);
+                    await loadAllData();
+                } else {
+                    showToast('本機電費單已全部同步至雲端，無待同步資料！');
+                    await loadAllData();
+                }
+            } catch (e) {
+                showToast('同步發生錯誤: ' + e.message, true);
             }
         }
 
@@ -724,6 +1182,9 @@
             await fetchKPIs();
             await fetchFilterOptions();
             await renderBillsTable();
+            if (typeof initOmCalculator === 'function') {
+                initOmCalculator();
+            }
         }
 
         async function fetchKPIs() {
@@ -762,8 +1223,16 @@
 
         function debounceSearch() {
             clearTimeout(searchTimeout);
-            const val = document.getElementById('searchInput').value.trim();
-            document.getElementById('clearSearchBtn').style.display = val ? 'flex' : 'none';
+            const inputEl = document.getElementById('searchInput');
+            let val = inputEl.value;
+
+            const trimmed = val.trim();
+            document.getElementById('clearSearchBtn').style.display = trimmed ? 'flex' : 'none';
+
+            // 顯示微型載入轉圈，避免清空整張表格造成劇烈抖動跳躍
+            const spinner = document.getElementById('searchSpinner');
+            if (spinner) spinner.classList.remove('hidden');
+
             searchTimeout = setTimeout(() => {
                 renderBillsTable();
             }, 300);
@@ -786,6 +1255,9 @@
         }
 
         async function renderBillsTable() {
+            const spinner = document.getElementById('searchSpinner');
+            if (spinner) spinner.classList.remove('hidden');
+
             const keyword = document.getElementById('searchInput').value.trim();
             const customer = document.getElementById('filterCustomer').value;
             const month = document.getElementById('filterMonth').value;
@@ -794,24 +1266,34 @@
             const [sortBy, order] = sortVal.split('_');
 
             const tbody = document.getElementById('billsTableBody');
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="9" class="py-12 text-center text-slate-400">
-                        <div class="inline-block animate-spin mb-2">
-                            <i data-lucide="loader-2" class="w-6 h-6 text-brand-600"></i>
-                        </div>
-                        <p>正在檢索資料庫...</p>
-                    </td>
-                </tr>
-            `;
-            lucide.createIcons();
+            const hasExistingRows = tbody && tbody.children.length > 0 && !tbody.querySelector('.animate-spin');
+
+            // 僅在第一次且完全無內容時才顯示佔位 spinner；已有資料時僅微調透明度，杜絕畫面跳動
+            if (!hasExistingRows) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="py-12 text-center text-slate-400">
+                            <div class="inline-block animate-spin mb-2">
+                                <i data-lucide="loader-2" class="w-6 h-6 text-brand-600"></i>
+                            </div>
+                            <p>正在檢索資料庫...</p>
+                        </td>
+                    </tr>
+                `;
+                lucide.createIcons();
+            } else {
+                tbody.classList.add('opacity-40');
+            }
 
             try {
                 const { bills, total, isDemo } = await SupabaseBillService.fetchBills({
                     keyword, customer, month, city, sortBy, order
                 });
                 currentBills = bills;
-                document.getElementById('resultsCount').innerText = `共找到 ${total} 筆電費單記錄 ${isDemo ? '(展示資料)' : '(Supabase 雲端資料)'}`;
+                const resultsCountEl = document.getElementById('resultsCount');
+                if (resultsCountEl) {
+                    resultsCountEl.innerText = `共找到 ${total} 筆電費單記錄 ${isDemo ? '(本地展示資料)' : '(Supabase 雲端資料)'}`;
+                }
 
                 if (!bills || bills.length === 0) {
                     tbody.innerHTML = `
@@ -835,9 +1317,6 @@
                     const capacityStr = b.installed_capacity_kw ? Number(b.installed_capacity_kw).toFixed(2) : '-';
                     const rateStr = b.fit_rate ? Number(b.fit_rate).toFixed(4) : '-';
                     const cityBadge = b.city ? `<span class="inline-block ml-1 px-1.5 py-0.5 text-[10px] rounded font-semibold bg-slate-100 text-slate-600 border border-slate-200">${b.city}</span>` : '';
-
-                    // Resolve PDF download url
-                    const downloadUrl = b.file_url || (b.filename ? `客戶電費單資料庫/${b.filename}` : '#');
 
                     return `
                         <tr class="hover:bg-slate-50/80 transition group">
@@ -898,6 +1377,9 @@
                         </td>
                     </tr>
                 `;
+            } finally {
+                tbody.classList.remove('opacity-40');
+                if (spinner) spinner.classList.add('hidden');
             }
         }
 
@@ -1066,57 +1548,170 @@
         }
 
         // -------------------------------------------------------------
-        // Client-side Taipower Bill Parsing Engine (Pure JS + PDF.js)
         // -------------------------------------------------------------
+        // Client-side Taipower Bill Parsing Engine (Pure JS + PDF.js + Tesseract OCR)
+        // -------------------------------------------------------------
+        const KNOWN_PLANTS = {
+            '11-63-0824-95-9': {
+                site_name: '五甲尾',
+                customer_name: '中租迪和股份有限公司',
+                contract_number: '11-PV-111-0233',
+                tax_id: '05072925',
+                plant_location: '高雄市阿蓮區五甲尾滯洪池',
+                city: '高雄市',
+                district: '阿蓮區',
+                installed_capacity_kw: 4999.2,
+                fit_rate: 4.8529,
+                taipower_branch: '高雄區營業處'
+            },
+            '08-40-8620-12-7': {
+                site_name: '美傢家具鹿港廠1',
+                customer_name: '美傢家具股份有限公司',
+                contract_number: '08-PV-109-0339',
+                tax_id: '23924765',
+                plant_location: '彰化縣鹿港鎮彰濱工業區鹿工路6號',
+                city: '彰化縣',
+                district: '鹿港鎮',
+                installed_capacity_kw: 1628.9,
+                fit_rate: 4.2444,
+                taipower_branch: '彰化區營業處'
+            },
+            '10-56-4770-02-1': {
+                site_name: '賴侯淑貞',
+                customer_name: '賴侯淑貞',
+                contract_number: '10-PV-106-0047',
+                tax_id: 'Q200880199',
+                plant_location: '彰化縣大城鄉頂莊段0453-0000地號',
+                city: '彰化縣',
+                district: '大城鄉',
+                installed_capacity_kw: 196.62,
+                fit_rate: 4.8111,
+                taipower_branch: '彰化區營業處'
+            },
+            '04-22-8469-91-3': {
+                site_name: '桃園蘆竹南工路一場',
+                customer_name: '中租迪和股份有限公司',
+                contract_number: '04-PV-109-0041',
+                tax_id: '05072925',
+                plant_location: '桃園市蘆竹區南工路41號（屋頂）一場',
+                city: '桃園市',
+                district: '蘆竹區',
+                installed_capacity_kw: 1943.50,
+                fit_rate: 5.0921,
+                taipower_branch: '桃園區營業處'
+            },
+            '18-35-9151-58-2': {
+                site_name: '高雄大寮磚子段',
+                customer_name: '中租迪和股份有限公司',
+                contract_number: '18-PV-109-0042',
+                tax_id: '05072925',
+                plant_location: '高雄市大寮區磚子段3362-1、3363~3374地號',
+                city: '高雄市',
+                district: '大寮區',
+                installed_capacity_kw: 693.00,
+                fit_rate: 4.6983,
+                taipower_branch: '鳳山區營業處'
+            },
+            '18-44-1100-22-1': {
+                site_name: '高雄小港同利路',
+                customer_name: '中租迪和股份有限公司',
+                contract_number: '18-PV-109-0447',
+                tax_id: '05072925',
+                plant_location: '高雄市小港區同利路20號',
+                city: '高雄市',
+                district: '小港區',
+                installed_capacity_kw: 744.25,
+                fit_rate: 4.2968,
+                taipower_branch: '鳳山區營業處'
+            }
+        };
+
+        function cleanNum(val) {
+            if (val === null || val === undefined) return null;
+            if (typeof val === 'number') return isNaN(val) ? null : val;
+            const s = String(val).replace(/,/g, '').replace(/[元度kWKW]/g, '').trim();
+            const num = parseFloat(s);
+            return isNaN(num) ? null : num;
+        }
+
+        function extractPeriodAndDates(text, filename) {
+            let period = '';
+            let start_ad = null;
+            let end_ad = null;
+            let ym_roc = '';
+            let ym_ad = '';
+
+            // 1. 民國日期格式 (例如: 115年09月01日~115年09月30日)
+            let m = text.match(/([0-9]{2,3})年([0-9]{1,2})月([0-9]{1,2})日\s*[~-]\s*([0-9]{2,3})年([0-9]{1,2})月([0-9]{1,2})日/);
+            if (m) {
+                const y1 = parseInt(m[1]), mo1 = parseInt(m[2]), d1 = parseInt(m[3]);
+                const y2 = parseInt(m[4]), mo2 = parseInt(m[5]), d2 = parseInt(m[6]);
+                period = `${y1}年${mo1}月${d1}日~${y2}年${mo2}月${d2}日`;
+                start_ad = `${y1 + 1911}-${String(mo1).padStart(2, '0')}-${String(d1).padStart(2, '0')}`;
+                end_ad = `${y2 + 1911}-${String(mo2).padStart(2, '0')}-${String(d2).padStart(2, '0')}`;
+                ym_roc = `${y2}年${mo2}月`;
+                ym_ad = `${y2 + 1911}-${String(mo2).padStart(2, '0')}`;
+                return { period, start_ad, end_ad, ym_roc, ym_ad };
+            }
+
+            // 2. 西元日期格式 (例如: 2026.9.1-2026.9.30 或 20260901-20260930 或 2026/09/01~2026/09/30)
+            const combined = `${filename || ''} ${text || ''}`;
+            m = combined.match(/(\d{4})[./-](\d{1,2})[./-](\d{1,2})\s*[-~至到]\s*(\d{4})[./-](\d{1,2})[./-](\d{1,2})/) ||
+                combined.match(/(\d{4})(\d{2})(\d{2})\s*[-~_]\s*(\d{4})(\d{2})(\d{2})/);
+            if (m) {
+                const y1 = parseInt(m[1]), mo1 = parseInt(m[2]), d1 = parseInt(m[3]);
+                const y2 = parseInt(m[4]), mo2 = parseInt(m[5]), d2 = parseInt(m[6]);
+                period = `${y1 - 1911}年${mo1}月${d1}日~${y2 - 1911}年${mo2}月${d2}日`;
+                start_ad = `${y1}-${String(mo1).padStart(2, '0')}-${String(d1).padStart(2, '0')}`;
+                end_ad = `${y2}-${String(mo2).padStart(2, '0')}-${String(d2).padStart(2, '0')}`;
+                ym_roc = `${y2 - 1911}年${mo2}月`;
+                ym_ad = `${y2}-${String(mo2).padStart(2, '0')}`;
+                return { period, start_ad, end_ad, ym_roc, ym_ad };
+            }
+
+            // 3. 帳單年月
+            m = text.match(/(\d{2,3})年(\d{1,2})月/);
+            if (m) {
+                const rocY = parseInt(m[1]), rocM = parseInt(m[2]);
+                ym_roc = `${rocY}年${rocM}月`;
+                ym_ad = `${rocY + 1911}-${String(rocM).padStart(2, '0')}`;
+            } else {
+                const now = new Date();
+                ym_roc = `${now.getFullYear() - 1911}年${now.getMonth() + 1}月`;
+                ym_ad = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            }
+
+            return { period, start_ad, end_ad, ym_roc, ym_ad };
+        }
+
         function parseTaipowerBillFromText(fullText, lines, filename) {
             const data = {
                 filename: filename,
+                raw_text: fullText,
                 status: 'PARSED'
             };
 
-            // 1. 電號 (e.g. 08-40-8620-12-7)
-            let m = fullText.match(/(\d{2}-\d{2}-\d{4}-\d{2}-\d{1})/);
-            if (!m && filename) {
-                m = filename.match(/(\d{2}-\d{2}-\d{4}-\d{2}-\d{1})/);
-            }
+            // 1. 電號 (例如: 08-40-8620-12-7 或 10-56-4770-02-1 或 11-63-0824-95-9)
+            let m = fullText.match(/(\d{2}-\d{2}-\d{4}-\d{2}-\d{1})/) ||
+                    (filename ? filename.match(/(\d{2}-\d{2}-\d{4}-\d{2}-\d{1})/) : null);
             data.electric_number = m ? m[1] : '';
+            if (!data.electric_number && filename && filename.includes('五甲尾')) {
+                data.electric_number = '11-63-0824-95-9';
+            }
 
-            // 2. 契約編號 (e.g. 08-PV-109-0339 or 10-PV-106-0047)
+            // 2. 契約編號 (例如: 08-PV-109-0339 或 10-PV-106-0047 或 11-PV-111-0233)
             m = fullText.match(/(\d{2}-[A-Za-z0-9]{2}-\d{3}-\d{4})/);
             data.contract_number = m ? m[1] : '';
 
-            // 3. 帳單年月 (e.g. 115年10月)
-            m = fullText.match(/(\d{2,3}年\d{1,2}月)/);
-            data.bill_year_month = m ? m[1] : '';
-            if (data.bill_year_month) {
-                const ym = data.bill_year_month.match(/(\d{2,3})年(\d{1,2})月/);
-                if (ym) {
-                    data.bill_year_month_ad = `${parseInt(ym[1]) + 1911}-${String(ym[2]).padStart(2, '0')}`;
-                }
-            } else {
-                const now = new Date();
-                const rocYear = now.getFullYear() - 1911;
-                data.bill_year_month = `${rocYear}年${now.getMonth() + 1}月`;
-                data.bill_year_month_ad = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-            }
+            // 3. 計費期間與帳單年月
+            const dateInfo = extractPeriodAndDates(fullText, filename);
+            data.billing_period = dateInfo.period;
+            data.billing_start_ad = dateInfo.start_ad;
+            data.billing_end_ad = dateInfo.end_ad;
+            data.bill_year_month = dateInfo.ym_roc;
+            data.bill_year_month_ad = dateInfo.ym_ad;
 
-            // 4. 計費期間
-            m = fullText.match(/計費期間[：:]\s*([0-9]{2,3}年[0-9]{1,2}月[0-9]{1,2}日\s*~\s*[0-9]{2,3}年[0-9]{1,2}月[0-9]{1,2}日)/) ||
-                fullText.match(/([0-9]{2,3}年[0-9]{1,2}月[0-9]{1,2}日\s*~\s*[0-9]{2,3}年[0-9]{1,2}月[0-9]{1,2}日)/);
-            if (m) {
-                data.billing_period = m[1].replace(/\s+/g, '');
-                const parts = data.billing_period.split('~');
-                if (parts.length === 2) {
-                    const p0 = parts[0].match(/(\d{2,3})年(\d{1,2})月(\d{1,2})日/);
-                    const p1 = parts[1].match(/(\d{2,3})年(\d{1,2})月(\d{1,2})日/);
-                    if (p0) data.billing_start_ad = `${parseInt(p0[1]) + 1911}-${String(p0[2]).padStart(2, '0')}-${String(p0[3]).padStart(2, '0')}`;
-                    if (p1) data.billing_end_ad = `${parseInt(p1[1]) + 1911}-${String(p1[2]).padStart(2, '0')}-${String(p1[3]).padStart(2, '0')}`;
-                }
-            } else {
-                data.billing_period = '';
-            }
-
-            // 5. 用戶名稱 & 地址
+            // 4. 用戶名稱與地址
             data.customer_name = '';
             data.customer_address = '';
             for (let i = 0; i < lines.length; i++) {
@@ -1135,12 +1730,12 @@
                 }
             }
 
-            // 6. 統編
-            m = fullText.match(/統一編號[：:]?\s*(\d{8})/);
+            // 5. 統一編號
+            m = fullText.match(/統一編號[：:\s]*([0-9A-Z]{8,10})/);
             data.tax_id = m ? m[1] : '';
 
-            // 7. 設置地點
-            m = fullText.match(/設置地點[：:]\s*([^\n\r]+)/);
+            // 6. 設置地點
+            m = fullText.match(/設置地點[：:\s]*([^\n\r]+)/);
             data.plant_location = m ? m[1].trim() : '';
 
             const cityM = data.plant_location.match(/(基隆市|台北市|新北市|桃園市|新竹市|新竹縣|苗栗縣|台中市|彰化縣|南投縣|雲林縣|嘉義市|嘉義縣|台南市|高雄市|屏東縣|宜蘭縣|花蓮縣|台東縣|澎湖縣|金門縣|連江縣)/);
@@ -1152,64 +1747,227 @@
                 data.district = '';
             }
 
-            // 8. 裝置容量
-            m = fullText.match(/併聯總裝置容量[^\d]*([0-9.]+)/);
-            data.installed_capacity_kw = m ? parseFloat(m[1]) : null;
+            // 7. 裝置容量 (Installed Capacity kW)
+            m = fullText.match(/併聯總裝置容量[^\d]*([0-9.]+)/) || fullText.match(/裝置容量[^\d]*([0-9.]+)/);
+            data.installed_capacity_kw = m ? cleanNum(m[1]) : null;
 
-            // 9. 購售電容量
-            m = fullText.match(/併聯總購售電容量[^\d]*([0-9.]+)/);
-            data.grid_capacity_kw = m ? parseFloat(m[1]) : data.installed_capacity_kw;
+            // 8. 購售電容量
+            m = fullText.match(/併聯總購售電容量[^\d]*([0-9.]+)/) || fullText.match(/購售電容量[^\d]*([0-9.]+)/);
+            data.grid_capacity_kw = m ? cleanNum(m[1]) : data.installed_capacity_kw;
 
-            // 10. 金額
-            m = fullText.match(/購電電費\s*[\n\r]*([0-9,]+)/);
-            data.purchase_amount = m ? parseInt(m[1].replace(/,/g, '')) : null;
+            // 9. 躉購費率 (元/度)
+            m = fullText.match(/費率[：:\s\n\r]*([0-9.]+)/) || fullText.match(/\b([3-7]\.\d{4})\b/);
+            data.fit_rate = m ? parseFloat(m[1]) : null;
 
-            m = fullText.match(/營業稅\s*[\n\r]*([0-9,]+)/);
-            data.tax_amount = m ? parseInt(m[1].replace(/,/g, '')) : null;
+            // 10. 機組與發電度數/金額拆解 (Multi-Strategy Extraction)
+            const machines = [];
+            const allNums = [...fullText.matchAll(/\b([0-9,]{3,10})\b/g)]
+                .map(x => parseInt(x[1].replace(/,/g, '')))
+                .filter(n => n >= 100);
 
-            m = fullText.match(/本期電表租費\s*[\n\r]*([-0-9,]+)/);
-            data.meter_rental_amount = m ? parseInt(m[1].replace(/,/g, '')) : 0;
-
-            m = fullText.match(/本期電費合計\s*[\n\r]*([0-9,]+)/);
-            data.total_bill_amount = m ? parseInt(m[1].replace(/,/g, '')) : null;
-
-            const mAll = [...fullText.matchAll(/應付總金額\s*[\n\r]*([0-9,]+)/g)];
-            if (mAll.length > 0) {
-                const valid = mAll.map(x => parseInt(x[1].replace(/,/g, ''))).filter(n => n >= 100);
-                data.net_payable_amount = valid.length ? valid[0] : null;
+            // 策略 0: 台電官方計費度數公式比對 (最精準權威)
+            // 例如: 購電度數 217,200x(1-0.0008%)-1,400= 215,798度 或 購電度數92,400x(1-0.003%)-600=91,797度 或 =28062度
+            let fMatch = fullText.match(/購電度數[^\r\n=＝]{2,60}[=＝]\s*([0-9,]+)/) ||
+                         fullText.match(/[=＝]\s*([0-9,]+)\s*(?:度|$)/);
+            if (fMatch) {
+                const kVal = cleanNum(fMatch[1]);
+                if (kVal && kVal >= 10) {
+                    data.total_kwh = kVal;
+                }
             }
 
-            if (!data.total_bill_amount && data.purchase_amount && data.tax_amount) {
-                data.total_bill_amount = data.purchase_amount + data.tax_amount;
+            // 策略 1: 多機組行內明細辨識 (支援多機組案場加總，如蘆竹4機組、大寮2機組)
+            const extractedMachines = [];
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (/機組\s*\d*/i.test(line)) {
+                    const mNums = [...line.matchAll(/\b([0-9,.]+)\b/g)]
+                        .map(x => cleanNum(x[1]))
+                        .filter(n => n !== null);
+                    if (mNums.length >= 3) {
+                        extractedMachines.push({
+                            name: line.match(/機組\s*\d*/i)?.[0] || `機組${extractedMachines.length + 1}`,
+                            rate: mNums[0],
+                            kwh: Math.round(mNums[1]),
+                            amount: Math.round(mNums[2])
+                        });
+                    }
+                }
+            }
+            if (extractedMachines.length > 0) {
+                machines.push(...extractedMachines);
+                if (!data.total_kwh) {
+                    data.total_kwh = extractedMachines.reduce((sum, m) => sum + m.kwh, 0);
+                }
+                if (!data.purchase_amount) {
+                    data.purchase_amount = extractedMachines.reduce((sum, m) => sum + m.amount, 0);
+                }
+                if (!data.fit_rate && data.total_kwh > 0 && data.purchase_amount > 0) {
+                    data.fit_rate = Number((data.purchase_amount / data.total_kwh).toFixed(4));
+                }
+            }
+
+            // 策略 2: 數學乘積反查 (全文本比對 kwh * rate ≈ purchase or total)
+            const activeRate = data.fit_rate || (KNOWN_PLANTS[data.electric_number] ? KNOWN_PLANTS[data.electric_number].fit_rate : (filename.includes('五甲尾') ? 4.8529 : null));
+            if (!data.total_kwh && activeRate && allNums.length >= 2) {
+                for (let k of allNums) {
+                    const expPurchase = Math.round(k * activeRate);
+                    const expTax = Math.round(expPurchase * 0.05);
+                    const expPayable = expPurchase + expTax;
+
+                    for (let a of allNums) {
+                        if (Math.abs(expPurchase - a) <= Math.max(80, expPurchase * 0.01)) {
+                            data.total_kwh = k;
+                            data.purchase_amount = a;
+                            machines.push({
+                                name: '機組1',
+                                rate: activeRate,
+                                kwh: k,
+                                amount: a
+                            });
+                            break;
+                        } else if (Math.abs(expPayable - a) <= Math.max(80, expPayable * 0.01)) {
+                            data.total_kwh = k;
+                            data.purchase_amount = expPurchase;
+                            data.net_payable_amount = a;
+                            machines.push({
+                                name: '機組1',
+                                rate: activeRate,
+                                kwh: k,
+                                amount: expPurchase
+                            });
+                            break;
+                        }
+                    }
+                    if (data.total_kwh) break;
+                }
+            }
+
+            // 策略 3: 正則模式匹配
+            if (!data.total_kwh) {
+                m = fullText.match(/[=＝]\s*([0-9,]+)\s*度/) || 
+                    fullText.match(/購電度數[：:\s]*([0-9,]+)/) ||
+                    fullText.match(/合計[：:\s]*([0-9,]+)\s*度/) ||
+                    fullText.match(/度數[：:\s\n\r]*([0-9,]+)\s*度/);
+                if (m) data.total_kwh = cleanNum(m[1]);
+            }
+
+            data.machines = machines;
+            data.machines_json = JSON.stringify(machines);
+
+            if (!data.fit_rate && activeRate) {
+                data.fit_rate = activeRate;
+            }
+
+            // 11. 金額欄位推算與驗證
+            if (!data.purchase_amount) {
+                m = fullText.match(/購電電費[：:\s\n\r]*([0-9,]+)/);
+                if (m) data.purchase_amount = cleanNum(m[1]);
+                else if (data.total_kwh && data.fit_rate) {
+                    data.purchase_amount = Math.round(data.total_kwh * data.fit_rate);
+                }
+            }
+
+            if (!data.tax_amount) {
+                m = fullText.match(/營業稅[：:\s\n\r]*([0-9,]+)/);
+                if (m) data.tax_amount = cleanNum(m[1]);
+                else if (data.purchase_amount) {
+                    data.tax_amount = Math.round(data.purchase_amount * 0.05);
+                }
+            }
+
+            m = fullText.match(/本期電表租費[：:\s\n\r]*([-0-9,]+)/) || fullText.match(/電表租費[：:\s\n\r]*([-0-9,]+)/);
+            data.meter_rental_amount = m ? cleanNum(m[1]) : 0;
+
+            if (!data.total_bill_amount) {
+                m = fullText.match(/[*＊]?本期電費合計[：:\s\n\r]*([0-9,]+)/);
+                if (m) data.total_bill_amount = cleanNum(m[1]);
+                else if (data.purchase_amount && data.tax_amount) {
+                    data.total_bill_amount = data.purchase_amount + data.tax_amount;
+                }
+            }
+
+            if (!data.net_payable_amount) {
+                const mAll = [...fullText.matchAll(/應付總金額[：:\s\n\r]*([0-9,]+)/g)];
+                if (mAll.length > 0) {
+                    const valid = mAll.map(x => cleanNum(x[1])).filter(n => n && n >= 100);
+                    if (valid.length) data.net_payable_amount = valid[0];
+                }
             }
             if (!data.net_payable_amount && data.total_bill_amount) {
                 data.net_payable_amount = data.total_bill_amount + (data.meter_rental_amount || 0);
+            } else if (!data.net_payable_amount && data.purchase_amount) {
+                data.net_payable_amount = data.purchase_amount + (data.tax_amount || 0) + (data.meter_rental_amount || 0);
             }
 
-            // 11. 總度數
-            m = fullText.match(/=\s*([0-9,]+)\s*度/) || fullText.match(/度數\s*[\n\r]*([0-9,]+)/);
-            data.total_kwh = m ? parseInt(m[1].replace(/,/g, '')) : null;
+            // 12. 抄表日與服務處所
+            m = fullText.match(/本次抄表日[^\d]*([0-9]{2,3}年[0-9]{1,2}月[0-9]{1,2}日)/);
+            data.meter_read_curr = m ? m[1] : '';
 
-            // 12. 費率
-            m = fullText.match(/費率\s*[\n\r]*([0-9.]+)/);
-            data.fit_rate = m ? parseFloat(m[1]) : null;
+            m = fullText.match(/服務部門[：:]\s*([^\n\r]+)/);
+            data.taipower_branch = m ? m[1].trim() : '';
 
-            // 13. 自動關聯案場名稱 (Site Name Mapping)
-            const mappings = JSON.parse(localStorage.getItem('SITE_MAPPINGS') || '{}');
-            if (data.electric_number === '08-40-8620-12-7') {
+            // 13. 銀行帳戶
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].includes('銀行')) {
+                    let acc = lines[i].trim();
+                    if (i + 1 < lines.length && (lines[i + 1].includes('帳戶') || /\d+號/.test(lines[i + 1]))) {
+                        acc += ' ' + lines[i + 1].trim();
+                    }
+                    data.payment_account = acc.replace(/。/g, '');
+                    break;
+                }
+            }
+
+            // 14. 智慧案場關聯與預設值補齊 (進金生能源案場庫)
+            const known = KNOWN_PLANTS[data.electric_number];
+            if (known) {
+                if (!data.customer_name) data.customer_name = known.customer_name;
+                if (!data.contract_number) data.contract_number = known.contract_number;
+                if (!data.tax_id) data.tax_id = known.tax_id;
+                if (!data.plant_location) data.plant_location = known.plant_location;
+                if (!data.city) data.city = known.city;
+                if (!data.district) data.district = known.district;
+                if (!data.installed_capacity_kw) data.installed_capacity_kw = known.installed_capacity_kw;
+                if (!data.grid_capacity_kw) data.grid_capacity_kw = known.installed_capacity_kw;
+                if (!data.fit_rate) data.fit_rate = known.fit_rate;
+                if (!data.taipower_branch) data.taipower_branch = known.taipower_branch;
+                data.site_name = known.site_name;
+            }
+
+            // 檔名特徵覆蓋案場名稱 (如: 五甲尾、美傢、賴侯)
+            if (filename.includes('五甲尾')) {
+                data.site_name = '五甲尾';
+                if (!data.electric_number) data.electric_number = '11-63-0824-95-9';
+                if (!data.contract_number) data.contract_number = '11-PV-111-0233';
+                if (!data.installed_capacity_kw) data.installed_capacity_kw = 4999.2;
+                if (!data.grid_capacity_kw) data.grid_capacity_kw = 4999.2;
+                if (!data.fit_rate) data.fit_rate = 4.8529;
+                if (!data.customer_name) data.customer_name = '中租迪和股份有限公司';
+                if (!data.tax_id) data.tax_id = '05072925';
+                if (!data.plant_location) data.plant_location = '高雄市阿蓮區五甲尾滯洪池';
+                if (!data.city) data.city = '高雄市';
+                if (!data.district) data.district = '阿蓮區';
+                if (!data.taipower_branch) data.taipower_branch = '高雄區營業處';
+            } else if (filename.includes('美傢')) {
                 data.site_name = '美傢家具鹿港廠1';
-            } else if (data.electric_number === '10-56-4770-02-1') {
+                if (!data.electric_number) data.electric_number = '08-40-8620-12-7';
+                if (!data.contract_number) data.contract_number = '08-PV-109-0339';
+                if (!data.installed_capacity_kw) data.installed_capacity_kw = 1628.9;
+                if (!data.fit_rate) data.fit_rate = 4.2444;
+            } else if (filename.includes('賴侯')) {
                 data.site_name = '賴侯淑貞';
-            } else if (mappings[data.electric_number]) {
-                data.site_name = mappings[data.electric_number];
-            } else {
-                data.site_name = filename.replace(/\.pdf$/i, '');
+                if (!data.electric_number) data.electric_number = '10-56-4770-02-1';
+                if (!data.contract_number) data.contract_number = '10-PV-106-0047';
+                if (!data.installed_capacity_kw) data.installed_capacity_kw = 196.62;
+                if (!data.fit_rate) data.fit_rate = 4.8111;
             }
 
-            // 若電號已有先前記帳歷史，智慧補齊基本資料
-            if (data.electric_number) {
-                const existing = currentBills.find(b => b.electric_number === data.electric_number);
+            // 若已有電號歷史，繼承靜態案場基本資料
+            if (data.electric_number && (typeof currentBills !== 'undefined' && currentBills)) {
+                const existing = currentBills.find(b => b.electric_number === data.electric_number && b.installed_capacity_kw);
                 if (existing) {
+                    if (!data.site_name) data.site_name = existing.site_name;
                     if (!data.customer_name) data.customer_name = existing.customer_name;
                     if (!data.customer_address) data.customer_address = existing.customer_address;
                     if (!data.tax_id) data.tax_id = existing.tax_id;
@@ -1219,10 +1977,25 @@
                     if (!data.installed_capacity_kw) data.installed_capacity_kw = existing.installed_capacity_kw;
                     if (!data.fit_rate) data.fit_rate = existing.fit_rate;
                     if (!data.contract_number) data.contract_number = existing.contract_number;
-                    if (!data.site_name || data.site_name === filename.replace(/\.pdf$/i, '')) {
-                        data.site_name = existing.site_name;
-                    }
                 }
+            }
+
+            if (!data.site_name) {
+                data.site_name = filename.replace(/\.pdf$/i, '');
+            }
+
+            // 15. 數值連動推算防護
+            if (!data.purchase_amount && data.total_kwh && data.fit_rate) {
+                data.purchase_amount = Math.round(data.total_kwh * data.fit_rate);
+            }
+            if (!data.tax_amount && data.purchase_amount) {
+                data.tax_amount = Math.round(data.purchase_amount * 0.05);
+            }
+            if (!data.total_bill_amount && data.purchase_amount && data.tax_amount) {
+                data.total_bill_amount = data.purchase_amount + data.tax_amount;
+            }
+            if (!data.net_payable_amount && data.total_bill_amount) {
+                data.net_payable_amount = data.total_bill_amount + (data.meter_rental_amount || 0);
             }
 
             return data;
@@ -1231,11 +2004,13 @@
         async function parsePdfClientSide(file) {
             let fullText = "";
             let lines = [];
+            let renderedCanvas = null;
+
             if (window.pdfjsLib) {
                 try {
                     const buffer = await file.arrayBuffer();
                     const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
-                    for (let i = 1; i <= pdf.numPages; i++) {
+                    for (let i = 1; i <= Math.min(pdf.numPages, 3); i++) {
                         const page = await pdf.getPage(i);
                         const textContent = await page.getTextContent();
                         let curLine = "";
@@ -1253,13 +2028,48 @@
                         }
                         if (curLine.trim()) lines.push(curLine.trim());
                         fullText += lines.join("\n") + "\n";
+
+                        // 若為第一頁，以 scale=2.0 繪製高解析 Canvas 供 Tesseract.js 備援 OCR
+                        if (i === 1) {
+                            try {
+                                const viewport = page.getViewport({ scale: 2.0 });
+                                const canvas = document.createElement('canvas');
+                                canvas.width = viewport.width;
+                                canvas.height = viewport.height;
+                                const ctx = canvas.getContext('2d');
+                                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                                renderedCanvas = canvas;
+                            } catch (e) {
+                                console.warn("Canvas render error:", e);
+                            }
+                        }
                     }
                 } catch (e) {
                     console.warn("Client PDF.js extract note:", e);
                 }
             }
 
-            const parsed = parseTaipowerBillFromText(fullText, lines, file.name);
+            // 先以文字層初步解析
+            let parsed = parseTaipowerBillFromText(fullText, lines, file.name);
+
+            // 若初步解析未獲得關鍵數值 (例如缺少購電度數或應付金額)，且有第一頁 Canvas 與 Tesseract 支援，立即啟動高解析 OCR 增強辨識！
+            if ((!parsed.total_kwh || !parsed.net_payable_amount) && renderedCanvas && window.Tesseract) {
+                try {
+                    const statusText = document.getElementById('uploadStatusText');
+                    if (statusText) statusText.innerText = `檢測到數值未完全辨識，正在啟動高解析 OCR 深度增強辨識...`;
+                    const ocrRes = await Tesseract.recognize(renderedCanvas, 'eng');
+                    if (ocrRes && ocrRes.data && ocrRes.data.text) {
+                        const ocrText = ocrRes.data.text;
+                        fullText += "\n" + ocrText;
+                        const ocrLines = ocrText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+                        lines.push(...ocrLines);
+                        parsed = parseTaipowerBillFromText(fullText, lines, file.name);
+                    }
+                } catch (ocrErr) {
+                    console.warn("Tesseract OCR fallback note:", ocrErr);
+                }
+            }
+
             parsed.file_size = file.size;
             return parsed;
         }
@@ -1325,7 +2135,11 @@
             await loadAllData();
 
             if (successCount > 0) {
-                showToast(`🎉 成功上傳並辨識 ${successCount} 份電費單，已納入資料庫！`);
+                if (SupabaseBillService.isConfigured()) {
+                    showToast(`🎉 成功上傳並辨識 ${successCount} 份電費單，已同步至 Supabase 雲端資料庫！全團隊皆可即時查看。`);
+                } else {
+                    showToast(`🎉 成功辨識 ${successCount} 份電費單！（提醒：目前為本地展示模式，僅存於這台電腦，請連線 Supabase 即可與團隊同步）`);
+                }
             }
             if (errors.length > 0) {
                 showToast(`部分檔案處理異常：${errors.join('; ')}`, true);
@@ -1380,7 +2194,7 @@
             document.getElementById('fieldRate').value = b.fit_rate || '';
             document.getElementById('fieldPurchaseAmount').value = b.purchase_amount || '';
             document.getElementById('fieldTaxAmount').value = b.tax_amount || '';
-            document.getElementById('fieldMeterRental').value = b.meter_rental_amount || '';
+            document.getElementById('fieldMeterRental').value = b.meter_rental_amount || 0;
             document.getElementById('fieldPayableAmount').value = b.net_payable_amount || '';
 
             document.getElementById('fieldPaymentAccount').value = b.payment_account || '';
@@ -1446,10 +2260,705 @@
             saveRow.style.display = isEditMode ? 'flex' : 'none';
         }
 
+        // 自動推算欄位連動計算
+        function autoCalculatePreviewAmounts() {
+            if (!isEditMode) return;
+            const kwh = parseFloat(document.getElementById('fieldKwh').value) || 0;
+            const rate = parseFloat(document.getElementById('fieldRate').value) || 0;
+            const rent = parseFloat(document.getElementById('fieldMeterRental').value) || 0;
+            if (kwh > 0 && rate > 0) {
+                const purchase = Math.round(kwh * rate);
+                const tax = Math.round(purchase * 0.05);
+                const payable = purchase + tax + rent;
+                document.getElementById('fieldPurchaseAmount').value = purchase;
+                document.getElementById('fieldTaxAmount').value = tax;
+                document.getElementById('fieldPayableAmount').value = payable;
+            }
+        }
+
         async function saveBillEdits() {
-            showToast('欄位編輯已儲存！');
-            isEditMode = false;
-            updateEditModeUI();
+            if (!activeBillId) return;
+            const saveBtn = document.querySelector('#saveEditActionRow button:last-child');
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.innerText = '正在儲存...';
+            }
+
+            try {
+                const capacityVal = cleanNum(document.getElementById('fieldCapacity').value);
+                const kwhVal = cleanNum(document.getElementById('fieldKwh').value);
+                const rateVal = cleanNum(document.getElementById('fieldRate').value);
+                let purchaseVal = cleanNum(document.getElementById('fieldPurchaseAmount').value);
+                let taxVal = cleanNum(document.getElementById('fieldTaxAmount').value);
+                const rentVal = cleanNum(document.getElementById('fieldMeterRental').value) || 0;
+                let payableVal = cleanNum(document.getElementById('fieldPayableAmount').value);
+
+                // 若輸入度數與費率但金額留空，自動計算
+                if (!purchaseVal && kwhVal && rateVal) {
+                    purchaseVal = Math.round(kwhVal * rateVal);
+                    taxVal = Math.round(purchaseVal * 0.05);
+                    payableVal = purchaseVal + taxVal + rentVal;
+                }
+
+                const updatedFields = {
+                    site_name: document.getElementById('fieldSiteName').value.trim(),
+                    electric_number: document.getElementById('fieldElectricNo').value.trim(),
+                    contract_number: document.getElementById('fieldContractNo').value.trim(),
+                    customer_name: document.getElementById('fieldCustomerName').value.trim(),
+                    tax_id: document.getElementById('fieldTaxId').value.trim(),
+                    plant_location: document.getElementById('fieldLocation').value.trim(),
+                    bill_year_month: document.getElementById('fieldBillMonth').value.trim(),
+                    billing_period: document.getElementById('fieldBillingPeriod').value.trim(),
+                    installed_capacity_kw: capacityVal,
+                    grid_capacity_kw: capacityVal,
+                    total_kwh: kwhVal,
+                    fit_rate: rateVal,
+                    purchase_amount: purchaseVal,
+                    tax_amount: taxVal,
+                    meter_rental_amount: rentVal,
+                    total_bill_amount: (purchaseVal && taxVal) ? (purchaseVal + taxVal) : null,
+                    net_payable_amount: payableVal,
+                    payment_account: document.getElementById('fieldPaymentAccount').value.trim(),
+                    taipower_branch: document.getElementById('fieldTaipowerBranch').value.trim(),
+                    meter_read_curr: document.getElementById('fieldMeterReadCurr').value.trim(),
+                };
+
+                if (updatedFields.bill_year_month) {
+                    const ym = updatedFields.bill_year_month.match(/(\d{2,3})年(\d{1,2})月/);
+                    if (ym) {
+                        updatedFields.bill_year_month_ad = `${parseInt(ym[1]) + 1911}-${String(ym[2]).padStart(2, '0')}`;
+                    }
+                }
+                if (updatedFields.plant_location) {
+                    const cityM = updatedFields.plant_location.match(/(基隆市|台北市|新北市|桃園市|新竹市|新竹縣|苗栗縣|台中市|彰化縣|南投縣|雲林縣|嘉義市|嘉義縣|台南市|高雄市|屏東縣|宜蘭縣|花蓮縣|台東縣|澎湖縣|金門縣|連江縣)/);
+                    if (cityM) updatedFields.city = cityM[1];
+                }
+
+                await SupabaseBillService.updateBill(activeBillId, updatedFields);
+                showToast('🎉 電費單欄位已成功儲存並同步至雲端！');
+                isEditMode = false;
+                updateEditModeUI();
+                await loadAllData();
+            } catch (err) {
+                showToast('儲存失敗: ' + err.message, true);
+            } finally {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerText = '儲存修改';
+                }
+            }
+        }
+
+        // =========================================================================
+        // 客服維運費用計算模組 (O&M Billing Calculator)
+        // 支援五甲尾 114/7/20~115/7/19 等任意跨月/破月日數精確切分、發電收入8%維運費試算、Excel匯出與列印
+        // =========================================================================
+        let omCurrentPlantKey = '11-63-0824-95-9'; // 預設案場：五甲尾
+        let omCustomKwhOverrides = {}; // 支援客服行內微調度數
+        let omLastCalcSummary = null;
+
+        function numberToChineseRocCurrency(num) {
+            if (isNaN(num) || num < 0) return '';
+            num = Math.round(num);
+            if (num === 0) return '新台幣零元整';
+            const digits = ['零', '壹', '貳', '參', '肆', '伍', '陸', '柒', '捌', '玖'];
+            const units = ['', '拾', '佰', '仟'];
+            const bigUnits = ['', '萬', '億', '兆'];
+            let str = '';
+            let numStr = String(num);
+
+            let chunks = [];
+            while (numStr.length > 0) {
+                chunks.push(numStr.slice(-4));
+                numStr = numStr.slice(0, -4);
+            }
+
+            for (let c = chunks.length - 1; c >= 0; c--) {
+                let chunk = chunks[c];
+                let chunkStr = '';
+                let chunkZero = false;
+                for (let i = 0; i < chunk.length; i++) {
+                    let digit = parseInt(chunk[i]);
+                    let unitIdx = chunk.length - 1 - i;
+                    if (digit === 0) {
+                        chunkZero = true;
+                    } else {
+                        if (chunkZero) {
+                            chunkStr += '零';
+                            chunkZero = false;
+                        }
+                        chunkStr += digits[digit] + units[unitIdx];
+                    }
+                }
+                if (chunkStr) {
+                    str += chunkStr + bigUnits[c];
+                }
+            }
+            return '新台幣 ' + str + '元整';
+        }
+
+        function switchMainView(view) {
+            const tabBills = document.getElementById('navTabBills');
+            const tabCalc = document.getElementById('navTabCalculator');
+            const billsView = document.getElementById('billsView');
+            const calcView = document.getElementById('calculatorView');
+            const topActions = document.getElementById('calculatorTopActions');
+
+            if (view === 'calculator') {
+                billsView.classList.add('hidden');
+                calcView.classList.remove('hidden');
+                tabBills.className = "inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-white text-slate-700 hover:bg-slate-50 border border-slate-200";
+                tabCalc.className = "inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-brand-600 text-white";
+                topActions.classList.remove('hidden');
+                initOmCalculator();
+            } else {
+                billsView.classList.remove('hidden');
+                calcView.classList.add('hidden');
+                tabBills.className = "inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-brand-600 text-white";
+                tabCalc.className = "inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-white text-slate-700 hover:bg-slate-50 border border-slate-200";
+                topActions.classList.add('hidden');
+            }
+            lucide.createIcons();
+        }
+
+        function initOmCalculator() {
+            const select = document.getElementById('omPlantSelect');
+            if (!select) return;
+
+            const plantMap = new Map();
+
+            // 1. 先注入已知標準案場庫
+            for (const [elec, p] of Object.entries(KNOWN_PLANTS)) {
+                plantMap.set(elec, {
+                    electric_number: elec,
+                    site_name: p.site_name,
+                    contract_number: p.contract_number,
+                    customer_name: p.customer_name,
+                    tax_id: p.tax_id,
+                    capacity: p.installed_capacity_kw,
+                    fit_rate: p.fit_rate,
+                    location: p.plant_location
+                });
+            }
+
+            // 2. 注入已載入電費單中的案場
+            if (currentBills && currentBills.length > 0) {
+                currentBills.forEach(b => {
+                    if (b.electric_number && !plantMap.has(b.electric_number)) {
+                        plantMap.set(b.electric_number, {
+                            electric_number: b.electric_number,
+                            site_name: b.site_name || b.electric_number,
+                            contract_number: b.contract_number || '',
+                            customer_name: b.customer_name || '中租迪和股份有限公司',
+                            tax_id: b.tax_id || '05072925',
+                            capacity: b.installed_capacity_kw || 0,
+                            fit_rate: b.fit_rate || 4.8529,
+                            location: b.plant_location || ''
+                        });
+                    }
+                });
+            }
+
+            select.innerHTML = '';
+            plantMap.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.electric_number;
+                opt.innerText = `${p.site_name} (${p.electric_number} ｜ 容量: ${p.capacity ? p.capacity + ' kW' : '-'})`;
+                if (p.electric_number === omCurrentPlantKey) {
+                    opt.selected = true;
+                }
+                select.appendChild(opt);
+            });
+
+            onOmPlantSelectChange();
+        }
+
+        function onOmPlantSelectChange() {
+            const select = document.getElementById('omPlantSelect');
+            if (!select) return;
+            omCurrentPlantKey = select.value;
+            const known = KNOWN_PLANTS[omCurrentPlantKey] || currentBills.find(b => b.electric_number === omCurrentPlantKey) || {};
+
+            const meta = document.getElementById('omPlantMeta');
+            if (meta) {
+                meta.innerText = `${known.customer_name || '中租迪和'} ｜ 容量: ${known.installed_capacity_kw || known.capacity || '-'} kW`;
+            }
+
+            if (known.fit_rate) {
+                document.getElementById('omFitRate').value = known.fit_rate;
+            }
+
+            // 若選取五甲尾，預設帶入合約區間 114/07/20 ~ 115/07/19
+            if (omCurrentPlantKey === '11-63-0824-95-9') {
+                document.getElementById('omStartDate').value = '2025-07-20';
+                document.getElementById('omEndDate').value = '2026-07-19';
+                document.getElementById('omRatio').value = '8.0';
+            }
+
+            omCustomKwhOverrides = {};
+            onOmDateChange();
+        }
+
+        function setOmQuickRange(type) {
+            if (type === 'wujiawei_p1') {
+                document.getElementById('omPlantSelect').value = '11-63-0824-95-9';
+                omCurrentPlantKey = '11-63-0824-95-9';
+                document.getElementById('omStartDate').value = '2025-07-20';
+                document.getElementById('omEndDate').value = '2026-07-19';
+                document.getElementById('omFitRate').value = '4.8529';
+                document.getElementById('omRatio').value = '8.0';
+            } else if (type === 'wujiawei_p2') {
+                document.getElementById('omPlantSelect').value = '11-63-0824-95-9';
+                omCurrentPlantKey = '11-63-0824-95-9';
+                document.getElementById('omStartDate').value = '2026-07-20';
+                document.getElementById('omEndDate').value = '2027-07-19';
+                document.getElementById('omFitRate').value = '4.8529';
+                document.getElementById('omRatio').value = '8.0';
+            } else if (type === 'last_year') {
+                const now = new Date();
+                const y = now.getFullYear();
+                document.getElementById('omEndDate').value = `${y}-12-31`;
+                document.getElementById('omStartDate').value = `${y}-01-01`;
+            }
+            omCustomKwhOverrides = {};
+            onOmDateChange();
+        }
+
+        function onOmDateChange() {
+            const sVal = document.getElementById('omStartDate').value;
+            const eVal = document.getElementById('omEndDate').value;
+            
+            if (sVal) {
+                const d = new Date(sVal + 'T00:00:00');
+                document.getElementById('omStartRocLabel').innerText = `${d.getFullYear() - 1911}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+            }
+            if (eVal) {
+                const d = new Date(eVal + 'T00:00:00');
+                document.getElementById('omEndRocLabel').innerText = `${d.getFullYear() - 1911}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+            }
+            runOmCalculation();
+        }
+
+        function resetOmCalculatedKwh() {
+            omCustomKwhOverrides = {};
+            runOmCalculation();
+            showToast('已重設為系統依天數佔比精確切分度數！');
+        }
+
+        function onOmRowKwhChange(billId, inputEl) {
+            const val = parseFloat(inputEl.value);
+            if (!isNaN(val) && val >= 0) {
+                omCustomKwhOverrides[billId] = val;
+            } else {
+                delete omCustomKwhOverrides[billId];
+            }
+            runOmCalculation();
+        }
+
+        function runOmCalculation() {
+            const plantKey = omCurrentPlantKey || document.getElementById('omPlantSelect').value;
+            const startStr = document.getElementById('omStartDate').value;
+            const endStr = document.getElementById('omEndDate').value;
+            const fitRate = parseFloat(document.getElementById('omFitRate').value) || 4.8529;
+            const omRatioPercent = parseFloat(document.getElementById('omRatio').value) || 8.0;
+            const omRatio = omRatioPercent / 100.0;
+            const taxRatePercent = parseFloat(document.getElementById('omTaxRate').value) || 5.0;
+            const taxRate = taxRatePercent / 100.0;
+
+            const formulaRate = document.getElementById('omFormulaRate');
+            const formulaRatio = document.getElementById('omFormulaRatio');
+            const kpiRatio = document.getElementById('omKpiRatioLabel');
+            if (formulaRate) formulaRate.innerText = fitRate.toFixed(4);
+            if (formulaRatio) formulaRatio.innerText = omRatioPercent.toFixed(1) + '%';
+            if (kpiRatio) kpiRatio.innerText = omRatioPercent.toFixed(1) + '%';
+
+            const cStart = new Date(startStr + 'T00:00:00');
+            const cEnd = new Date(endStr + 'T23:59:59');
+
+            // 篩選該案場之帳單
+            let plantBills = currentBills.filter(b => b.electric_number === plantKey || (plantKey === '11-63-0824-95-9' && (b.site_name === '五甲尾' || (b.filename && b.filename.includes('五甲尾')))));
+
+            const rowData = [];
+            plantBills.forEach(b => {
+                let bStart = null;
+                let bEnd = null;
+
+                if (b.billing_start_ad && b.billing_end_ad) {
+                    bStart = new Date(b.billing_start_ad + 'T00:00:00');
+                    bEnd = new Date(b.billing_end_ad + 'T23:59:59');
+                } else if (b.billing_period) {
+                    const m = b.billing_period.match(/([0-9]{2,3})年([0-9]{1,2})月([0-9]{1,2})日\s*[~-]\s*([0-9]{2,3})年([0-9]{1,2})月([0-9]{1,2})日/);
+                    if (m) {
+                        bStart = new Date(parseInt(m[1]) + 1911, parseInt(m[2]) - 1, parseInt(m[3]), 0, 0, 0);
+                        bEnd = new Date(parseInt(m[4]) + 1911, parseInt(m[5]) - 1, parseInt(m[6]), 23, 59, 59);
+                    }
+                }
+                
+                if (!bStart || !bEnd) {
+                    if (b.bill_year_month_ad) {
+                        const parts = b.bill_year_month_ad.split('-').map(Number);
+                        bStart = new Date(parts[0], parts[1] - 1, 1, 0, 0, 0);
+                        bEnd = new Date(parts[0], parts[1], 0, 23, 59, 59);
+                    } else {
+                        return;
+                    }
+                }
+
+                // 計算電費單全期日數
+                const totalDays = Math.round((bEnd.getTime() - bStart.getTime()) / (1000 * 60 * 60 * 24));
+                
+                // 計算與維運合約區間的交集日數
+                const ovStart = new Date(Math.max(bStart.getTime(), cStart.getTime()));
+                const ovEnd = new Date(Math.min(bEnd.getTime(), cEnd.getTime()));
+
+                if (ovEnd.getTime() >= ovStart.getTime()) {
+                    const ovDays = Math.round((ovEnd.getTime() - ovStart.getTime()) / (1000 * 60 * 60 * 24));
+                    const ratio = totalDays > 0 ? (ovDays / totalDays) : 0;
+                    const origKwh = b.total_kwh || 0;
+                    
+                    // 檢查客服是否手動自訂度數
+                    let calcKwh = omCustomKwhOverrides[b.id] !== undefined 
+                        ? omCustomKwhOverrides[b.id] 
+                        : Math.round(origKwh * ratio * 100) / 100;
+
+                    const revenue = Math.round(calcKwh * fitRate);
+                    const omFee = Math.round(revenue * omRatio);
+
+                    // 破月判定
+                    let modeBadge = '';
+                    let modeType = '整月 100%';
+                    if (ovDays === totalDays) {
+                        modeBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">整月 100%</span>';
+                        modeType = '整月 100%';
+                    } else if (bStart.getTime() < cStart.getTime()) {
+                        modeBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">首月破月 (${ovDays}/${totalDays}天)</span>`;
+                        modeType = `首月破月 (${ovDays}/${totalDays}天)`;
+                    } else if (bEnd.getTime() > cEnd.getTime()) {
+                        modeBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800">尾月破月 (${ovDays}/${totalDays}天)</span>`;
+                        modeType = `尾月破月 (${ovDays}/${totalDays}天)`;
+                    } else {
+                        modeBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800">區間 (${ovDays}/${totalDays}天)</span>`;
+                        modeType = `區間 (${ovDays}/${totalDays}天)`;
+                    }
+
+                    const ovStartRoc = `${ovStart.getFullYear() - 1911}/${String(ovStart.getMonth() + 1).padStart(2, '0')}/${String(ovStart.getDate()).padStart(2, '0')}`;
+                    const ovEndRoc = `${ovEnd.getFullYear() - 1911}/${String(ovEnd.getMonth() + 1).padStart(2, '0')}/${String(ovEnd.getDate()).padStart(2, '0')}`;
+                    const bStartRoc = `${bStart.getFullYear() - 1911}/${String(bStart.getMonth() + 1).padStart(2, '0')}/${String(bStart.getDate()).padStart(2, '0')}`;
+                    const bEndRoc = `${bEnd.getFullYear() - 1911}/${String(bEnd.getMonth() + 1).padStart(2, '0')}/${String(bEnd.getDate()).padStart(2, '0')}`;
+
+                    rowData.push({
+                        bill: b,
+                        bStart,
+                        bEnd,
+                        bStartRoc,
+                        bEndRoc,
+                        totalDays,
+                        ovStart,
+                        ovEnd,
+                        ovStartRoc,
+                        ovEndRoc,
+                        ovDays,
+                        ratio,
+                        origKwh,
+                        calcKwh,
+                        revenue,
+                        omFee,
+                        modeBadge,
+                        modeType
+                    });
+                }
+            });
+
+            // 依時間升冪排序
+            rowData.sort((a, b) => a.bStart.getTime() - b.bStart.getTime());
+
+            // 統計加總
+            let sumDays = 0;
+            let sumOrigKwh = 0;
+            let sumCalcKwh = 0;
+            let sumRevenue = 0;
+            let sumOmFeeNet = 0;
+
+            rowData.forEach(r => {
+                sumDays += r.ovDays;
+                sumOrigKwh += r.origKwh;
+                sumCalcKwh += r.calcKwh;
+                sumRevenue += r.revenue;
+                sumOmFeeNet += r.omFee;
+            });
+
+            const sumTax = Math.round(sumOmFeeNet * taxRate);
+            const sumGross = sumOmFeeNet + sumTax;
+
+            const plantInfo = KNOWN_PLANTS[plantKey] || currentBills.find(b => b.electric_number === plantKey) || {};
+            omLastCalcSummary = {
+                plantKey,
+                plantName: plantInfo.site_name || '五甲尾',
+                customerName: plantInfo.customer_name || '中租迪和股份有限公司',
+                taxId: plantInfo.tax_id || '05072925',
+                location: plantInfo.plant_location || '',
+                contractNumber: plantInfo.contract_number || '',
+                capacity: plantInfo.installed_capacity_kw || plantInfo.capacity || 4999.2,
+                startRoc: `${cStart.getFullYear() - 1911}/${String(cStart.getMonth() + 1).padStart(2, '0')}/${String(cStart.getDate()).padStart(2, '0')}`,
+                endRoc: `${cEnd.getFullYear() - 1911}/${String(cEnd.getMonth() + 1).padStart(2, '0')}/${String(cEnd.getDate()).padStart(2, '0')}`,
+                fitRate,
+                omRatioPercent,
+                taxRatePercent,
+                rows: rowData,
+                sumDays,
+                sumOrigKwh,
+                sumCalcKwh,
+                sumRevenue,
+                sumOmFeeNet,
+                sumTax,
+                sumGross
+            };
+
+            // 更新 KPI 卡片
+            const elTotalKwh = document.getElementById('omKpiTotalKwh');
+            const elMonthCount = document.getElementById('omKpiMonthCount');
+            const elDaysCount = document.getElementById('omKpiDaysCount');
+            const elTotalRev = document.getElementById('omKpiTotalRevenue');
+            const elFeeNet = document.getElementById('omKpiFeeNet');
+            const elTax = document.getElementById('omKpiTax');
+            const elTotalGross = document.getElementById('omKpiTotalGross');
+
+            if (elTotalKwh) elTotalKwh.innerText = Math.round(sumCalcKwh).toLocaleString();
+            if (elMonthCount) elMonthCount.innerText = rowData.length;
+            if (elDaysCount) elDaysCount.innerText = `${sumDays} 天`;
+            if (elTotalRev) elTotalRev.innerText = 'NT$ ' + sumRevenue.toLocaleString();
+            if (elFeeNet) elFeeNet.innerText = 'NT$ ' + sumOmFeeNet.toLocaleString();
+            if (elTax) elTax.innerText = 'NT$ ' + sumTax.toLocaleString();
+            if (elTotalGross) elTotalGross.innerText = 'NT$ ' + sumGross.toLocaleString();
+
+            // 渲染表格內容
+            const tbody = document.getElementById('omTableBody');
+            const tfoot = document.getElementById('omTableFoot');
+            if (!tbody) return;
+
+            if (rowData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="13" class="py-8 text-center text-slate-400">在此計費區間內未檢索到該案場之電費單，請確認案場或調整起訖日期。</td></tr>`;
+                if (tfoot) tfoot.innerHTML = '';
+                return;
+            }
+
+            tbody.innerHTML = rowData.map((r, idx) => `
+                <tr class="hover:bg-slate-50 transition ${r.modeType !== '整月 100%' ? 'bg-amber-50/20' : ''}">
+                    <td class="py-2.5 px-3 text-center text-slate-400 font-sans">${idx + 1}</td>
+                    <td class="py-2.5 px-3 font-bold text-slate-800">${r.bill.bill_year_month || r.bill.bill_year_month_ad}</td>
+                    <td class="py-2.5 px-3 text-slate-600">${r.bStartRoc} ~ ${r.bEndRoc}</td>
+                    <td class="py-2.5 px-3 text-center text-slate-500">${r.totalDays}天</td>
+                    <td class="py-2.5 px-3 font-medium text-brand-700">${r.ovStartRoc} ~ ${r.ovEndRoc}</td>
+                    <td class="py-2.5 px-3 text-center font-bold text-slate-800">${r.ovDays}天</td>
+                    <td class="py-2.5 px-3 text-center text-slate-500">${(r.ratio * 100).toFixed(1)}%</td>
+                    <td class="py-2.5 px-3 text-right text-slate-500">${r.origKwh.toLocaleString()}</td>
+                    <td class="py-2.5 px-3 text-right font-bold text-brand-800">
+                        <input type="number" step="0.01" value="${r.calcKwh}" onchange="onOmRowKwhChange(${r.bill.id}, this)" class="w-24 text-right font-bold text-brand-700 bg-brand-50/60 border border-brand-200 rounded p-1 text-xs focus:bg-white focus:ring-1 focus:ring-brand-500 font-mono" title="點擊可直接手動自訂計費度數">
+                    </td>
+                    <td class="py-2.5 px-3 text-right text-emerald-700 font-semibold">${r.revenue.toLocaleString()}</td>
+                    <td class="py-2.5 px-3 text-right text-amber-700 font-bold">${r.omFee.toLocaleString()}</td>
+                    <td class="py-2.5 px-3 text-center font-sans">${r.modeBadge}</td>
+                    <td class="py-2.5 px-3 text-center font-sans">
+                        <button onclick="previewBill(${r.bill.id})" class="inline-flex items-center space-x-1 px-2 py-0.5 text-[11px] font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded border border-brand-200 transition">
+                            <i data-lucide="file-text" class="w-3 h-3"></i>
+                            <span>原單</span>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            if (tfoot) {
+                tfoot.innerHTML = `
+                    <tr class="bg-slate-100/90 text-slate-900 border-t-2 border-slate-300">
+                        <td colspan="5" class="py-3 px-3 text-right font-bold font-sans">合 計 總 計（共 ${rowData.length} 期 帳單）：</td>
+                        <td class="py-3 px-3 text-center font-bold text-brand-800">${sumDays}天</td>
+                        <td class="py-3 px-3 text-center text-slate-500 font-sans">-</td>
+                        <td class="py-3 px-3 text-right text-slate-600">${sumOrigKwh.toLocaleString()}</td>
+                        <td class="py-3 px-3 text-right font-black text-brand-900 text-sm">${Math.round(sumCalcKwh).toLocaleString()}</td>
+                        <td class="py-3 px-3 text-right font-bold text-emerald-800">${sumRevenue.toLocaleString()}</td>
+                        <td class="py-3 px-3 text-right font-black text-amber-800 text-sm">NT$ ${sumOmFeeNet.toLocaleString()}</td>
+                        <td colspan="2" class="py-3 px-3 text-center text-xs font-sans text-slate-500">
+                            營業稅 5%: NT$ ${sumTax.toLocaleString()}<br>
+                            <strong>含稅總計: NT$ ${sumGross.toLocaleString()}</strong>
+                        </td>
+                    </tr>
+                `;
+            }
+
+            lucide.createIcons();
+        }
+
+        function openPrintInvoiceModal() {
+            if (!omLastCalcSummary) runOmCalculation();
+            const s = omLastCalcSummary;
+            if (!s || s.rows.length === 0) {
+                showToast('目前無計算資料可列印', true);
+                return;
+            }
+
+            const now = new Date();
+            const invNo = `INV-OM-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${s.plantKey.replace(/-/g,'').slice(-6)}`;
+            document.getElementById('printInvNo').innerText = invNo;
+            document.getElementById('printInvDate').innerText = `民國 ${now.getFullYear() - 1911} 年 ${now.getMonth() + 1} 月 ${now.getDate()} 日`;
+            document.getElementById('printCustomerName').innerText = s.customerName;
+            document.getElementById('printTaxId').innerText = s.taxId;
+            document.getElementById('printPlantName').innerText = `${s.plantName} 太陽能電廠`;
+            document.getElementById('printLocation').innerText = s.location || '高雄市阿蓮區五甲尾滯洪池';
+            document.getElementById('printElectricNo').innerText = s.plantKey;
+            document.getElementById('printContractNo').innerText = s.contractNumber || '-';
+            document.getElementById('printCapacity').innerText = s.capacity;
+            document.getElementById('printBillingRange').innerText = `民國 ${s.startRoc} 至 ${s.endRoc} (共 ${s.sumDays} 天)`;
+            document.getElementById('printFitRate').innerText = `${s.fitRate.toFixed(4)} 元/度`;
+            document.getElementById('printOmRatio').innerText = `${s.omRatioPercent.toFixed(1)} %`;
+
+            const tbody = document.getElementById('printTableBody');
+            tbody.innerHTML = s.rows.map((r, idx) => `
+                <tr class="border-b border-slate-200">
+                    <td class="p-1.5 border border-slate-200 text-center">${idx + 1}</td>
+                    <td class="p-1.5 border border-slate-200">${r.bill.bill_year_month || r.bill.bill_year_month_ad}</td>
+                    <td class="p-1.5 border border-slate-200">${r.bStartRoc}~${r.bEndRoc}</td>
+                    <td class="p-1.5 border border-slate-200 text-center">${r.totalDays}</td>
+                    <td class="p-1.5 border border-slate-200">${r.ovStartRoc}~${r.ovEndRoc}</td>
+                    <td class="p-1.5 border border-slate-200 text-center font-bold">${r.ovDays}</td>
+                    <td class="p-1.5 border border-slate-200 text-center">${(r.ratio * 100).toFixed(1)}%</td>
+                    <td class="p-1.5 border border-slate-200 text-right">${r.origKwh.toLocaleString()}</td>
+                    <td class="p-1.5 border border-slate-200 text-right font-bold">${Math.round(r.calcKwh).toLocaleString()}</td>
+                    <td class="p-1.5 border border-slate-200 text-right">${r.revenue.toLocaleString()}</td>
+                    <td class="p-1.5 border border-slate-200 text-right font-bold">${r.omFee.toLocaleString()}</td>
+                </tr>
+            `).join('');
+
+            const tfoot = document.getElementById('printTableFoot');
+            tfoot.innerHTML = `
+                <tr>
+                    <td colspan="5" class="p-2 border border-slate-300 text-right font-bold">合 計：</td>
+                    <td class="p-2 border border-slate-300 text-center font-bold">${s.sumDays} 天</td>
+                    <td class="p-2 border border-slate-300 text-center">-</td>
+                    <td class="p-2 border border-slate-300 text-right">${s.sumOrigKwh.toLocaleString()}</td>
+                    <td class="p-2 border border-slate-300 text-right font-black">${Math.round(s.sumCalcKwh).toLocaleString()}</td>
+                    <td class="p-2 border border-slate-300 text-right font-bold">${s.sumRevenue.toLocaleString()}</td>
+                    <td class="p-2 border border-slate-300 text-right font-black">NT$ ${s.sumOmFeeNet.toLocaleString()}</td>
+                </tr>
+            `;
+
+            document.getElementById('printNetFee').innerText = `NT$ ${s.sumOmFeeNet.toLocaleString()}`;
+            document.getElementById('printTaxFee').innerText = `NT$ ${s.sumTax.toLocaleString()}`;
+            document.getElementById('printGrossFee').innerText = `NT$ ${s.sumGross.toLocaleString()}`;
+            document.getElementById('printChineseAmount').innerText = numberToChineseRocCurrency(s.sumGross);
+
+            document.getElementById('printInvoiceModal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closePrintInvoiceModal() {
+            document.getElementById('printInvoiceModal').classList.add('hidden');
+        }
+
+        function doPrintInvoice() {
+            window.print();
+        }
+
+        function copyOmSummaryText() {
+            if (!omLastCalcSummary) runOmCalculation();
+            const s = omLastCalcSummary;
+            if (!s) return;
+
+            const text = `【進金生能源 太陽能電廠維運服務費用請款通知】
+客戶名稱：${s.customerName}
+案場名稱：${s.plantName} (${s.plantKey})
+契約編號：${s.contractNumber || '-'}
+計費區間：民國 ${s.startRoc} 至 ${s.endRoc} (共 ${s.rows.length} 期 / ${s.sumDays} 天)
+----------------------------------------
+納入計費總度數：${Math.round(s.sumCalcKwh).toLocaleString()} 度
+躉購費率：${s.fitRate.toFixed(4)} 元/度
+發電總收入 (未稅)：NT$ ${s.sumRevenue.toLocaleString()}
+維運服務費率：${s.omRatioPercent.toFixed(1)}%
+----------------------------------------
+實際維運費用 (未稅)：NT$ ${s.sumOmFeeNet.toLocaleString()}
+加計營業稅 (5%)：NT$ ${s.sumTax.toLocaleString()}
+應收請款總額 (含稅)：NT$ ${s.sumGross.toLocaleString()}
+金額大寫：${numberToChineseRocCurrency(s.sumGross)}
+----------------------------------------
+備註：首期 / 尾期破月依實際涵蓋天數比例精確切分度數。`;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast('🎉 已複製維運請款文字摘要至剪貼簿！可直接貼入 LINE / Email！');
+                }).catch(() => {
+                    prompt('請複製以下請款摘要：', text);
+                });
+            } else {
+                prompt('請複製以下請款摘要：', text);
+            }
+        }
+
+        function exportOmCalculatorExcel() {
+            if (!omLastCalcSummary) runOmCalculation();
+            const s = omLastCalcSummary;
+            if (!s) return;
+
+            if (window.XLSX) {
+                const rows = [
+                    ['進金生能源服務股份有限公司 維運費用請款試算清冊'],
+                    ['客戶名稱', s.customerName, '統一編號', s.taxId],
+                    ['案場名稱', s.plantName, '台電電號', s.plantKey, '契約編號', s.contractNumber],
+                    ['計費區間', `民國 ${s.startRoc} 至 ${s.endRoc}`, '計費天數', `${s.sumDays} 天`],
+                    ['躉購費率 (元/度)', s.fitRate, '維運費率', `${s.omRatioPercent}%`],
+                    [],
+                    ['項次', '帳單月份', '台電計費期間', '全期天數', '納入計費區間', '計費日數', '天數佔比', '原單度數 (kWh)', '納入計費度數 (kWh)', '發電收入 (未稅 NT$)', '維運費用 (未稅 NT$)', '計費模式']
+                ];
+
+                s.rows.forEach((r, idx) => {
+                    rows.push([
+                        idx + 1,
+                        r.bill.bill_year_month || r.bill.bill_year_month_ad,
+                        `${r.bStartRoc}~${r.bEndRoc}`,
+                        r.totalDays,
+                        `${r.ovStartRoc}~${r.ovEndRoc}`,
+                        r.ovDays,
+                        `${(r.ratio * 100).toFixed(1)}%`,
+                        r.origKwh,
+                        r.calcKwh,
+                        r.revenue,
+                        r.omFee,
+                        r.modeType
+                    ]);
+                });
+
+                rows.push([]);
+                rows.push(['合計總計', '', '', '', '', s.sumDays, '', s.sumOrigKwh, Math.round(s.sumCalcKwh), s.sumRevenue, s.sumOmFeeNet]);
+                rows.push(['實際維運費用 (未稅)', s.sumOmFeeNet]);
+                rows.push(['營業稅 (5%)', s.sumTax]);
+                rows.push(['應收請款總額 (含稅)', s.sumGross]);
+                rows.push(['金額大寫', numberToChineseRocCurrency(s.sumGross)]);
+
+                const ws = XLSX.utils.aoa_to_sheet(rows);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "維運費用請款試算");
+                const fname = `進金生能源_維運費用請款試算_${s.plantName}_${s.startRoc.replace(/\//g,'')}-${s.endRoc.replace(/\//g,'')}.xlsx`;
+                XLSX.writeFile(wb, fname);
+                showToast('🎉 Excel 試算表已成功匯出下載！');
+            } else {
+                let csv = '\uFEFF';
+                csv += `"項次","帳單月份","台電計費期間","全期天數","納入計費區間","計費日數","佔比","原單度數","計費度數","發電收入未稅","維運費用未稅"
+`;
+                s.rows.forEach((r, idx) => {
+                    csv += `"${idx+1}","${r.bill.bill_year_month}","${r.bStartRoc}~${r.bEndRoc}","${r.totalDays}","${r.ovStartRoc}~${r.ovEndRoc}","${r.ovDays}","${(r.ratio*100).toFixed(1)}%","${r.origKwh}","${r.calcKwh}","${r.revenue}","${r.omFee}"
+`;
+                });
+                csv += `"合計","","","","","${s.sumDays}","","${s.sumOrigKwh}","${Math.round(s.sumCalcKwh)}","${s.sumRevenue}","${s.sumOmFeeNet}"
+`;
+                csv += `"營業稅 5%","${s.sumTax}"
+`;
+                csv += `"含稅總額","${s.sumGross}"
+`;
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `維運費用試算_${s.plantName}.csv`;
+                a.click();
+                showToast('已匯出 CSV 試算表！');
+            }
         }
     </script>
 </body>

@@ -123,6 +123,112 @@ const SEED_BILLS = [
       { name: "機組1", rate: 4.8111, kwh: 28062, amount: 135009 }
     ],
     status: "PARSED"
+  },
+  {
+    id: 56,
+    filename: "04-22-8469-91-3_210692_1.pdf",
+    file_url: "https://cowljafosekwvxithwjd.supabase.co/storage/v1/object/public/bills/bills/1792553820844_04-22-8469-91-3_210692_1.pdf",
+    electric_number: "04-22-8469-91-3",
+    contract_number: "04-PV-109-0041",
+    site_name: "桃園蘆竹南工路一場",
+    customer_name: "中租迪和股份有限公司",
+    customer_address: "台北市內湖區瑞光路362號8~12樓",
+    tax_id: "05072925",
+    bill_year_month: "115年10月",
+    bill_year_month_ad: "2026-10",
+    billing_period: "115年09月01日~115年09月30日",
+    plant_location: "桃園市蘆竹區南工路41號（屋頂）一場",
+    city: "桃園市",
+    district: "蘆竹區",
+    installed_capacity_kw: 1943.50,
+    grid_capacity_kw: 1943.50,
+    total_kwh: 215798,
+    fit_rate: 5.0921,
+    purchase_amount: 1098871,
+    tax_amount: 54944,
+    total_bill_amount: 1153815,
+    meter_rental_amount: -996,
+    net_payable_amount: 1152819,
+    payment_account: "永豐商業銀行營業部 99717300000443號帳戶",
+    taipower_branch: "桃園區營業處",
+    taipower_tel: "(03)3392121",
+    meter_read_curr: "115年10月01日",
+    machines: [
+      { name: "機組1", rate: 5.1630, kwh: 53950, amount: 278544 },
+      { name: "機組2", rate: 5.0685, kwh: 53950, amount: 273446 },
+      { name: "機組3", rate: 5.0685, kwh: 53950, amount: 273446 },
+      { name: "機組4", rate: 5.0685, kwh: 53948, amount: 273435 }
+    ],
+    status: "PARSED"
+  },
+  {
+    id: 57,
+    filename: "18-35-9151-58-2_210632_1.pdf",
+    file_url: "https://cowljafosekwvxithwjd.supabase.co/storage/v1/object/public/bills/bills/1792553828311_18-35-9151-58-2_210632_1.pdf",
+    electric_number: "18-35-9151-58-2",
+    contract_number: "18-PV-109-0042",
+    site_name: "高雄大寮磚子段",
+    customer_name: "中租迪和股份有限公司",
+    customer_address: "台北市內湖區瑞光路362號6樓",
+    tax_id: "05072925",
+    bill_year_month: "115年10月",
+    bill_year_month_ad: "2026-10",
+    billing_period: "115年09月01日~115年09月30日",
+    plant_location: "高雄市大寮區磚子段3362-1、3363~3374地號",
+    city: "高雄市",
+    district: "大寮區",
+    installed_capacity_kw: 693.00,
+    grid_capacity_kw: 693.00,
+    total_kwh: 69896,
+    fit_rate: 4.6983,
+    purchase_amount: 328392,
+    tax_amount: 16420,
+    total_bill_amount: 344812,
+    meter_rental_amount: -1008,
+    net_payable_amount: 343804,
+    payment_account: "華南商業銀行民生分行 98935000000849號帳戶",
+    taipower_branch: "鳳山區營業處",
+    taipower_tel: "(07)7410111",
+    meter_read_curr: "115年10月01日",
+    machines: [
+      { name: "機組1", rate: 4.6983, kwh: 50325, amount: 236442 },
+      { name: "機組2", rate: 4.6983, kwh: 19571, amount: 91950 }
+    ],
+    status: "PARSED"
+  },
+  {
+    id: 58,
+    filename: "18-44-1100-22-1_210650_1.pdf",
+    file_url: "https://cowljafosekwvxithwjd.supabase.co/storage/v1/object/public/bills/bills/1792553834218_18-44-1100-22-1_210650_1.pdf",
+    electric_number: "18-44-1100-22-1",
+    contract_number: "18-PV-109-0447",
+    site_name: "高雄小港同利路",
+    customer_name: "中租迪和股份有限公司",
+    customer_address: "台北市內湖區瑞光路362號8樓",
+    tax_id: "05072925",
+    bill_year_month: "115年10月",
+    bill_year_month_ad: "2026-10",
+    billing_period: "115年09月01日~115年09月30日",
+    plant_location: "高雄市小港區同利路20號",
+    city: "高雄市",
+    district: "小港區",
+    installed_capacity_kw: 744.25,
+    grid_capacity_kw: 744.25,
+    total_kwh: 91797,
+    fit_rate: 4.2968,
+    purchase_amount: 394433,
+    tax_amount: 19722,
+    total_bill_amount: 414155,
+    meter_rental_amount: -983,
+    net_payable_amount: 413172,
+    payment_account: "彰化商業銀行民生分行 95106999900315號帳戶",
+    taipower_branch: "鳳山區營業處",
+    taipower_tel: "(07)7410111",
+    meter_read_curr: "115年10月01日",
+    machines: [
+      { name: "機組1", rate: 4.2968, kwh: 91797, amount: 394433 }
+    ],
+    status: "PARSED"
   }
 ];
 
@@ -158,12 +264,16 @@ const SupabaseBillService = {
       console.warn("URL params parse note:", e);
     }
 
+    // 預設進金生能源團隊共用 Supabase 雲端憑證 (團隊同仁免手動設定，開箱即用同步)
+    const DEFAULT_URL = 'https://cowljafosekwvxithwjd.supabase.co';
+    const DEFAULT_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvd2xqYWZvc2Vrd3Z4aXRod2pkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2NTYzODcsImV4cCI6MjA5NDIzMjM4N30.c8YXP7EXDeTOw-mJEmnYZ_DJeZv6Qt6HVDzEf8J2K_I';
+
     const defCfg = window.DEFAULT_SUPABASE_CONFIG || window.SUPABASE_CONFIG || {};
     const localUrl = localStorage.getItem('SB_URL');
     const localKey = localStorage.getItem('SB_ANON_KEY');
     return {
-      url: (localUrl && localUrl.trim()) ? localUrl.trim() : (defCfg.url || 'https://cowljafosekwvxithwjd.supabase.co'),
-      anonKey: (localKey && localKey.trim()) ? localKey.trim() : (defCfg.anonKey || '')
+      url: (localUrl && localUrl.trim()) ? localUrl.trim() : (defCfg.url || DEFAULT_URL),
+      anonKey: (localKey && localKey.trim()) ? localKey.trim() : (defCfg.anonKey || DEFAULT_ANON_KEY)
     };
   },
 
