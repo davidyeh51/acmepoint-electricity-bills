@@ -418,6 +418,18 @@ const SupabaseBillService = {
           finalPayload = { ...existingRow };
           for (const [k, v] of Object.entries(payload)) {
             if (v !== null && v !== undefined && v !== '') {
+              // 防護 1: 裝置容量防護，禁止以 196.62 覆蓋 4999.2 kW 等大型案場
+              if (k === 'installed_capacity_kw' && existingRow.installed_capacity_kw >= 1000 && v < 1000) {
+                continue;
+              }
+              // 防護 2: 發電度數防護，禁止以本機舊錯誤小數值 (<10000 kWh) 覆蓋雲端正確大額發電量 (>100000 kWh)
+              if (k === 'total_kwh' && existingRow.total_kwh > 100000 && v < 10000) {
+                continue;
+              }
+              // 防護 3: 金額防護，禁止以低額 (<50000 NT$) 覆蓋雲端正確請款大額 (>500000 NT$)
+              if (k === 'net_payable_amount' && existingRow.net_payable_amount > 500000 && v < 50000) {
+                continue;
+              }
               finalPayload[k] = v;
             }
           }
@@ -527,6 +539,13 @@ const SupabaseBillService = {
 
     const { data, count, error } = await query;
     if (error) throw error;
+
+    // 當載入完整帳單時，自動回寫本機快取，徹底覆蓋並洗淨歷史殘留之舊數據
+    if (data && data.length > 0 && !customer && !month && !city && !keyword) {
+      try {
+        localStorage.setItem('CUSTOM_LOCAL_BILLS', JSON.stringify(data));
+      } catch (e) {}
+    }
 
     return { bills: data || [], total: count || (data ? data.length : 0), isDemo: false };
   },
@@ -781,6 +800,18 @@ const SupabaseBillService = {
           finalPayload = { ...existingRow };
           for (const [k, v] of Object.entries(payload)) {
             if (v !== null && v !== undefined && v !== '') {
+              // 防護 1: 裝置容量防護，禁止以 196.62 覆蓋 4999.2 kW 等大型案場
+              if (k === 'installed_capacity_kw' && existingRow.installed_capacity_kw >= 1000 && v < 1000) {
+                continue;
+              }
+              // 防護 2: 發電度數防護，禁止以本機舊錯誤小數值 (<10000 kWh) 覆蓋雲端正確大額發電量 (>100000 kWh)
+              if (k === 'total_kwh' && existingRow.total_kwh > 100000 && v < 10000) {
+                continue;
+              }
+              // 防護 3: 金額防護，禁止以低額 (<50000 NT$) 覆蓋雲端正確請款大額 (>500000 NT$)
+              if (k === 'net_payable_amount' && existingRow.net_payable_amount > 500000 && v < 50000) {
+                continue;
+              }
               finalPayload[k] = v;
             }
           }

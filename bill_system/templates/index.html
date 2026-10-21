@@ -1554,12 +1554,12 @@
         const KNOWN_PLANTS = {
             '11-63-0824-95-9': {
                 site_name: '五甲尾',
-                customer_name: '中租迪和股份有限公司',
+                customer_name: '中租電力科技股份有限公司',
                 contract_number: '11-PV-111-0233',
-                tax_id: '05072925',
-                plant_location: '高雄市阿蓮區五甲尾滯洪池',
+                tax_id: '43941328',
+                plant_location: '高雄市岡山區嘉興段344、344-2等 (五甲尾滯洪池)',
                 city: '高雄市',
-                district: '阿蓮區',
+                district: '岡山區',
                 installed_capacity_kw: 4999.2,
                 fit_rate: 4.8529,
                 taipower_branch: '高雄區營業處'
@@ -1807,10 +1807,23 @@
                 }
             }
 
+            // 策略 0.5: 台電電費通知單表格「電費計算」購電度數 (機組1 4.8529 552640 2,681,907)
+            if (!data.total_kwh) {
+                const tblMatch = fullText.match(/機組\s*\d*\s*([0-9.]+)\s+([0-9]{4,8})\s+([0-9,]+)/i);
+                if (tblMatch) {
+                    data.fit_rate = parseFloat(tblMatch[1]);
+                    data.total_kwh = parseInt(tblMatch[2], 10);
+                    data.purchase_amount = cleanNum(tblMatch[3]);
+                }
+            }
+
             // 策略 2: 數學乘積反查 (全文本比對 kwh * rate ≈ purchase or total)
             const activeRate = data.fit_rate || (KNOWN_PLANTS[data.electric_number] ? KNOWN_PLANTS[data.electric_number].fit_rate : (filename.includes('五甲尾') ? 4.8529 : null));
             if (!data.total_kwh && activeRate && allNums.length >= 2) {
+                // 門檻防護：若為 1MW 以上大型案場（如五甲尾 5MW），單月發電量必須 >= 10,000 度，防止夜間廠用受電 (480/520度) 誤判
+                const minKwhThreshold = (data.installed_capacity_kw && data.installed_capacity_kw >= 1000) || (filename && filename.includes('五甲尾')) ? 10000 : 100;
                 for (let k of allNums) {
+                    if (k < minKwhThreshold) continue;
                     const expPurchase = Math.round(k * activeRate);
                     const expTax = Math.round(expPurchase * 0.05);
                     const expPayable = expPurchase + expTax;
@@ -1936,19 +1949,20 @@
             }
 
             // 檔名特徵覆蓋案場名稱 (如: 五甲尾、美傢、賴侯)
-            if (filename.includes('五甲尾')) {
+            if (filename.includes('五甲尾') || data.electric_number === '11-63-0824-95-9') {
                 data.site_name = '五甲尾';
-                if (!data.electric_number) data.electric_number = '11-63-0824-95-9';
-                if (!data.contract_number) data.contract_number = '11-PV-111-0233';
-                if (!data.installed_capacity_kw) data.installed_capacity_kw = 4999.2;
-                if (!data.grid_capacity_kw) data.grid_capacity_kw = 4999.2;
-                if (!data.fit_rate) data.fit_rate = 4.8529;
-                if (!data.customer_name) data.customer_name = '中租迪和股份有限公司';
-                if (!data.tax_id) data.tax_id = '05072925';
-                if (!data.plant_location) data.plant_location = '高雄市阿蓮區五甲尾滯洪池';
-                if (!data.city) data.city = '高雄市';
-                if (!data.district) data.district = '阿蓮區';
-                if (!data.taipower_branch) data.taipower_branch = '高雄區營業處';
+                data.electric_number = '11-63-0824-95-9';
+                data.contract_number = '11-PV-111-0233';
+                data.installed_capacity_kw = 4999.2;
+                data.grid_capacity_kw = 4999.2;
+                data.fit_rate = 4.8529;
+                data.customer_name = '中租電力科技股份有限公司';
+                data.tax_id = '43941328';
+                data.plant_location = '高雄市岡山區嘉興段344、344-2等 (五甲尾滯洪池)';
+                data.city = '高雄市';
+                data.district = '岡山區';
+                data.meter_rental_amount = -983;
+                data.taipower_branch = '高雄區營業處';
             } else if (filename.includes('美傢')) {
                 data.site_name = '美傢家具鹿港廠1';
                 if (!data.electric_number) data.electric_number = '08-40-8620-12-7';
@@ -1982,6 +1996,31 @@
 
             if (!data.site_name) {
                 data.site_name = filename.replace(/\.pdf$/i, '');
+            }
+
+            // 五甲尾 5MW 超大型案場強制鎖定與防污機制 (Sanity Guard)
+            if (data.electric_number === '11-63-0824-95-9' || (data.site_name && data.site_name.includes('五甲尾')) || (filename && filename.includes('五甲尾'))) {
+                data.site_name = '五甲尾';
+                data.electric_number = '11-63-0824-95-9';
+                data.contract_number = '11-PV-111-0233';
+                data.customer_name = '中租電力科技股份有限公司';
+                data.tax_id = '43941328';
+                data.plant_location = '高雄市岡山區嘉興段344、344-2等 (五甲尾滯洪池)';
+                data.city = '高雄市';
+                data.district = '岡山區';
+                data.installed_capacity_kw = 4999.2;
+                data.grid_capacity_kw = 4999.2;
+                data.fit_rate = 4.8529;
+                data.meter_rental_amount = -983;
+                data.taipower_branch = '高雄區營業處';
+                if (data.total_kwh && data.total_kwh < 10000) {
+                    // 若度數異常偏低 (<10,000度)，必為廠用電或未乘8000倍數，予以作廢防護
+                    data.total_kwh = null;
+                    data.purchase_amount = null;
+                    data.total_bill_amount = null;
+                    data.net_payable_amount = null;
+                    data.machines = [];
+                }
             }
 
             // 15. 數值連動推算防護
