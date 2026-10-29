@@ -167,14 +167,16 @@ const SEED_BILLS = [
     file_url: "https://cowljafosekwvxithwjd.supabase.co/storage/v1/object/public/bills/bills/1792553828311_18-35-9151-58-2_210632_1.pdf",
     electric_number: "18-35-9151-58-2",
     contract_number: "18-PV-109-0042",
-    site_name: "高雄大寮磚子段",
+    site_name: "高雄大寮磚子磘段",
     customer_name: "中租迪和股份有限公司",
     customer_address: "台北市內湖區瑞光路362號6樓",
     tax_id: "05072925",
     bill_year_month: "115年10月",
     bill_year_month_ad: "2026-10",
     billing_period: "115年09月01日~115年09月30日",
-    plant_location: "高雄市大寮區磚子段3362-1、3363~3374地號",
+    billing_start_ad: "2026-09-01",
+    billing_end_ad: "2026-09-30",
+    plant_location: "高雄市大寮區磚子磘段3362-1、3363~3374地號",
     city: "高雄市",
     district: "大寮區",
     installed_capacity_kw: 693.00,
@@ -209,6 +211,8 @@ const SEED_BILLS = [
     bill_year_month: "115年10月",
     bill_year_month_ad: "2026-10",
     billing_period: "115年09月01日~115年09月30日",
+    billing_start_ad: "2026-09-01",
+    billing_end_ad: "2026-09-30",
     plant_location: "高雄市小港區同利路20號",
     city: "高雄市",
     district: "小港區",
@@ -227,6 +231,114 @@ const SEED_BILLS = [
     meter_read_curr: "115年10月01日",
     machines: [
       { name: "機組1", rate: 4.2968, kwh: 91797, amount: 394433 }
+    ],
+    status: "PARSED"
+  },
+  {
+    id: 59,
+    filename: "11-73-5518-95-1_212818_1.pdf",
+    file_url: "https://cowljafosekwvxithwjd.supabase.co/storage/v1/object/public/bills/bills/1793238282909_11-73-5518-95-1_212818_1.pdf",
+    electric_number: "11-73-5518-95-1",
+    contract_number: "11-PV-105-0164",
+    site_name: "高雄路竹永華路",
+    customer_name: "中租迪和股份有限公司",
+    customer_address: "台北市內湖區瑞光路362號8樓",
+    tax_id: "05072925",
+    bill_year_month: "115年9月",
+    bill_year_month_ad: "2026-09",
+    billing_period: "115年09月01日~115年09月30日",
+    billing_start_ad: "2026-09-01",
+    billing_end_ad: "2026-09-30",
+    plant_location: "高雄市路竹區永華路98、102號",
+    city: "高雄市",
+    district: "路竹區",
+    installed_capacity_kw: 499.40,
+    grid_capacity_kw: 499.40,
+    total_kwh: 3907,
+    fit_rate: 4.8056,
+    purchase_amount: 18775,
+    tax_amount: 939,
+    total_bill_amount: 19714,
+    meter_rental_amount: -347,
+    net_payable_amount: 19367,
+    payment_account: "彰化商業銀行民生分行 95100099900198號帳戶",
+    taipower_branch: "高雄區營業處",
+    taipower_tel: "(07)5513291",
+    meter_read_curr: "115年10月01日",
+    machines: [
+      { name: "機組1", rate: 4.8056, kwh: 3907, amount: 18775 }
+    ],
+    status: "PARSED"
+  },
+  {
+    id: 60,
+    filename: "1150901-1150930中租迪和股份有限公司EPC計費通知書11-73-5518-95-1.pdf",
+    file_url: "https://cowljafosekwvxithwjd.supabase.co/storage/v1/object/public/bills/bills/1793238288130_1150901-1150930_______EPC_____.pdf",
+    electric_number: "11-73-5518-95-1",
+    contract_number: "11-PV-105-0164",
+    site_name: "高雄路竹永華路 (轉供計費)",
+    customer_name: "中租迪和股份有限公司",
+    customer_address: "台北市內湖區瑞光路362號",
+    tax_id: "05072925",
+    bill_year_month: "115年9月",
+    bill_year_month_ad: "2026-09",
+    billing_period: "115年09月01日~115年09月30日",
+    billing_start_ad: "2026-09-01",
+    billing_end_ad: "2026-09-30",
+    plant_location: "高雄市路竹區永華路98、102號",
+    city: "高雄市",
+    district: "路竹區",
+    installed_capacity_kw: 499.40,
+    grid_capacity_kw: 499.40,
+    total_kwh: 52240,
+    fit_rate: 4.8056,
+    purchase_amount: 251045,
+    tax_amount: 12552,
+    total_bill_amount: 263597,
+    meter_rental_amount: 0,
+    net_payable_amount: 263597,
+    payment_account: "中曜股份有限公司 (綠電轉供購電計費通知書)",
+    taipower_branch: "中曜股份有限公司 (售電轉供)",
+    taipower_tel: "統一編號 91061096",
+    meter_read_curr: "115年09月30日",
+    machines: [
+      { name: "綠電轉供", rate: 4.8056, kwh: 52240, amount: 251045 }
+    ],
+    status: "PARSED"
+  },
+  {
+    id: 61,
+    filename: "03-54-8093-99-5_213400_1.pdf",
+    file_url: "https://cowljafosekwvxithwjd.supabase.co/storage/v1/object/public/bills/bills/1793238289402_03-54-8093-99-5_213400_1.pdf",
+    electric_number: "03-54-8093-99-5",
+    contract_number: "03-PV-108-0126",
+    site_name: "宜蘭蘇澳新馬南路",
+    customer_name: "中租迪和股份有限公司",
+    customer_address: "台北市內湖區瑞光路362號8樓至12樓",
+    tax_id: "05072925",
+    bill_year_month: "115年10月",
+    bill_year_month_ad: "2026-10",
+    billing_period: "115年09月18日~115年10月20日",
+    billing_start_ad: "2026-09-18",
+    billing_end_ad: "2026-10-20",
+    plant_location: "宜蘭縣蘇澳鎮新馬南路36號",
+    city: "宜蘭縣",
+    district: "蘇澳鎮",
+    installed_capacity_kw: 276.48,
+    grid_capacity_kw: 276.48,
+    total_kwh: 29744,
+    fit_rate: 5.163,
+    purchase_amount: 153568,
+    tax_amount: 7678,
+    total_bill_amount: 161246,
+    meter_rental_amount: -260,
+    net_payable_amount: 160986,
+    payment_account: "台灣新光商業銀行松竹分行 99519600000078號帳戶",
+    taipower_branch: "宜蘭區營業處",
+    taipower_tel: "(03)9354800",
+    meter_read_curr: "115年10月21日",
+    machines: [
+      { name: "機組1", rate: 5.163, kwh: 29744, amount: 153568 }
     ],
     status: "PARSED"
   }
@@ -418,16 +530,20 @@ const SupabaseBillService = {
           finalPayload = { ...existingRow };
           for (const [k, v] of Object.entries(payload)) {
             if (v !== null && v !== undefined && v !== '') {
-              // 防護 1: 裝置容量防護，禁止以 196.62 覆蓋 4999.2 kW 等大型案場
-              if (k === 'installed_capacity_kw' && existingRow.installed_capacity_kw >= 1000 && v < 1000) {
+              // 防護 1: 裝置容量防護，禁止以小容量覆蓋既有大容量
+              if (k === 'installed_capacity_kw' && existingRow.installed_capacity_kw >= 500 && v < existingRow.installed_capacity_kw * 0.8) {
                 continue;
               }
-              // 防護 2: 發電度數防護，禁止以本機舊錯誤小數值 (<10000 kWh) 覆蓋雲端正確大額發電量 (>100000 kWh)
-              if (k === 'total_kwh' && existingRow.total_kwh > 100000 && v < 10000) {
+              // 防護 2: 發電度數防護，禁止以錯誤小數值或單機組局部值 (< 既有值 50%) 覆蓋雲端正確發電量
+              if (k === 'total_kwh' && existingRow.total_kwh > 500 && v < existingRow.total_kwh * 0.5) {
                 continue;
               }
-              // 防護 3: 金額防護，禁止以低額 (<50000 NT$) 覆蓋雲端正確請款大額 (>500000 NT$)
-              if (k === 'net_payable_amount' && existingRow.net_payable_amount > 500000 && v < 50000) {
+              // 防護 3: 金額防護，禁止以低額 (< 既有值 50%) 覆蓋雲端正確請款金額
+              if ((k === 'net_payable_amount' || k === 'purchase_amount' || k === 'total_bill_amount') && existingRow[k] > 2000 && v < existingRow[k] * 0.5) {
+                continue;
+              }
+              // 防護 4: 案場名稱防護，禁止以未命名的原始電號檔名 (如 18-35-9151-58-2_210632_1) 覆蓋已命名的中文案場名
+              if (k === 'site_name' && existingRow.site_name && !/^\d{2}-\d{2}-\d{4}/.test(existingRow.site_name) && /^\d{2}-\d{2}-\d{4}/.test(String(v))) {
                 continue;
               }
               finalPayload[k] = v;
@@ -540,10 +656,11 @@ const SupabaseBillService = {
     const { data, count, error } = await query;
     if (error) throw error;
 
-    // 當載入完整帳單時，自動回寫本機快取，徹底覆蓋並洗淨歷史殘留之舊數據
+    // 當載入完整帳單時，自動回寫本機快取並標記已同步，徹底覆蓋並洗淨歷史殘留之舊數據
     if (data && data.length > 0 && !customer && !month && !city && !keyword) {
       try {
-        localStorage.setItem('CUSTOM_LOCAL_BILLS', JSON.stringify(data));
+        const syncedData = data.map(r => ({ ...r, synced_to_cloud: true }));
+        localStorage.setItem('CUSTOM_LOCAL_BILLS', JSON.stringify(syncedData));
       } catch (e) {}
     }
 
@@ -737,6 +854,24 @@ const SupabaseBillService = {
     let syncedCount = 0;
     for (let b of customList) {
       try {
+        // 若此筆已標記同步完成且已有雲端 URL，直接跳過，避免拿本機舊快取重複覆寫雲端最新修正資料
+        if (b.synced_to_cloud && b.file_url && b.file_url.includes('supabase.co')) {
+          continue;
+        }
+
+        // 先檢查雲端是否已經存在完整記錄
+        const { data: existingCheck } = await supabaseInstance
+          .from('electricity_bills')
+          .select('*')
+          .eq('filename', b.filename)
+          .maybeSingle();
+
+        if (existingCheck && existingCheck.total_kwh > 0 && existingCheck.installed_capacity_kw > 0 && existingCheck.net_payable_amount > 0) {
+          b.synced_to_cloud = true;
+          syncedCount++;
+          continue;
+        }
+
         let cloudFileUrl = b.file_url;
         // 若尚未有雲端 Storage 連結（或仍是 blob: 本地臨時連結），嘗試上傳 PDF 二進制
         if (!cloudFileUrl || cloudFileUrl.startsWith('blob:') || !cloudFileUrl.includes('supabase.co')) {
@@ -800,16 +935,20 @@ const SupabaseBillService = {
           finalPayload = { ...existingRow };
           for (const [k, v] of Object.entries(payload)) {
             if (v !== null && v !== undefined && v !== '') {
-              // 防護 1: 裝置容量防護，禁止以 196.62 覆蓋 4999.2 kW 等大型案場
-              if (k === 'installed_capacity_kw' && existingRow.installed_capacity_kw >= 1000 && v < 1000) {
+              // 防護 1: 裝置容量防護，禁止以小容量覆蓋既有大容量
+              if (k === 'installed_capacity_kw' && existingRow.installed_capacity_kw >= 500 && v < existingRow.installed_capacity_kw * 0.8) {
                 continue;
               }
-              // 防護 2: 發電度數防護，禁止以本機舊錯誤小數值 (<10000 kWh) 覆蓋雲端正確大額發電量 (>100000 kWh)
-              if (k === 'total_kwh' && existingRow.total_kwh > 100000 && v < 10000) {
+              // 防護 2: 發電度數防護，禁止以錯誤小數值或單機組局部值 (< 既有值 50%) 覆蓋雲端正確發電量
+              if (k === 'total_kwh' && existingRow.total_kwh > 500 && v < existingRow.total_kwh * 0.5) {
                 continue;
               }
-              // 防護 3: 金額防護，禁止以低額 (<50000 NT$) 覆蓋雲端正確請款大額 (>500000 NT$)
-              if (k === 'net_payable_amount' && existingRow.net_payable_amount > 500000 && v < 50000) {
+              // 防護 3: 金額防護，禁止以低額 (< 既有值 50%) 覆蓋雲端正確請款金額
+              if ((k === 'net_payable_amount' || k === 'purchase_amount' || k === 'total_bill_amount') && existingRow[k] > 2000 && v < existingRow[k] * 0.5) {
+                continue;
+              }
+              // 防護 4: 案場名稱防護，禁止以未命名的原始電號檔名 (如 18-35-9151-58-2_210632_1) 覆蓋已命名的中文案場名
+              if (k === 'site_name' && existingRow.site_name && !/^\d{2}-\d{2}-\d{4}/.test(existingRow.site_name) && /^\d{2}-\d{2}-\d{4}/.test(String(v))) {
                 continue;
               }
               finalPayload[k] = v;
