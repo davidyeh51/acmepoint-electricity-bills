@@ -134,8 +134,8 @@
         </div>
 
         <!-- Main Navigation Tabs -->
-        <div id="mainNavTabs" class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-3 gap-3">
-            <div class="flex items-center space-x-2">
+        <div id="mainNavTabs" class="flex flex-col lg:flex-row lg:items-center justify-between border-b border-slate-200 pb-3 gap-3">
+            <div class="flex flex-wrap items-center gap-2">
                 <button id="navTabBills" onclick="switchMainView('bills')" class="inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-brand-600 text-white">
                     <i data-lucide="table-2" class="w-4 h-4"></i>
                     <span>電費單資料庫管理</span>
@@ -144,6 +144,11 @@
                     <i data-lucide="calculator" class="w-4 h-4 text-brand-600"></i>
                     <span>客服維運費用試算 (O&M Calculator)</span>
                     <span class="px-2 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded-full">客服專屬</span>
+                </button>
+                <button id="navTabMapYield" onclick="switchMainView('mapyield')" class="inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-white text-slate-700 hover:bg-slate-50 border border-slate-200">
+                    <i data-lucide="map-pin" class="w-4 h-4 text-emerald-600"></i>
+                    <span>案場地圖 ＆ 區鄉鎮峰瓦值 (kWh/kWp)</span>
+                    <span class="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 rounded-full">Google Maps + 反推</span>
                 </button>
             </div>
             <div id="calculatorTopActions" class="hidden flex items-center space-x-2">
@@ -158,6 +163,12 @@
                 <button onclick="openPrintInvoiceModal()" class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition shadow-md" title="列印或另存 PDF 請款單">
                     <i data-lucide="printer" class="w-3.5 h-3.5"></i>
                     <span>列印請款明細單</span>
+                </button>
+            </div>
+            <div id="mapYieldTopActions" class="hidden flex items-center space-x-2">
+                <button onclick="exportYieldAnalysisExcel()" class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition shadow-sm" title="匯出區鄉鎮與各案場 1~12 月峰瓦值 Excel 報表">
+                    <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-emerald-600"></i>
+                    <span>匯出區鄉鎮＆案場峰瓦值 Excel</span>
                 </button>
             </div>
         </div>
@@ -528,7 +539,365 @@
             </div>
         </div><!-- End calculatorView -->
 
+        <!-- ==================== VIEW 3: GOOGLE MAPS & DISTRICT kWh/kWp YIELD ANALYTICS ==================== -->
+        <div id="mapYieldView" class="hidden space-y-6">
+            <!-- Top KPI Summary Cards -->
+            <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
+                        <span>涵蓋行政區 (區/鄉/鎮)</span>
+                        <i data-lucide="map" class="w-4 h-4 text-emerald-600"></i>
+                    </div>
+                    <div class="flex items-baseline space-x-1">
+                        <span id="kpiMapDistrictCount" class="text-2xl font-black text-slate-900">0</span>
+                        <span class="text-xs text-slate-400">個區鄉鎮</span>
+                    </div>
+                    <p id="kpiMapCityList" class="text-[11px] text-slate-500 mt-1 truncate">涵蓋北中南東案場</p>
+                </div>
+
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
+                        <span>定位案場 / 總裝置容量</span>
+                        <i data-lucide="zap" class="w-4 h-4 text-amber-500"></i>
+                    </div>
+                    <div class="flex items-baseline space-x-1">
+                        <span id="kpiMapTotalKwp" class="text-2xl font-black text-brand-700">0</span>
+                        <span class="text-xs text-slate-500 font-bold">kWp</span>
+                    </div>
+                    <p id="kpiMapPlantCountSub" class="text-[11px] text-slate-500 mt-1">共 0 座太陽能案場</p>
+                </div>
+
+                <div class="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-xl border border-amber-200 shadow-sm">
+                    <div class="flex items-center justify-between text-amber-900 text-xs font-bold mb-1">
+                        <span>全場平均日峰瓦值 (DMY)</span>
+                        <i data-lucide="sun" class="w-4 h-4 text-amber-600"></i>
+                    </div>
+                    <div class="flex items-baseline space-x-1">
+                        <span id="kpiMapAvgDailyYield" class="text-2xl font-black text-amber-900">0.00</span>
+                        <span class="text-xs font-bold text-amber-800">kWh/kWp/日</span>
+                    </div>
+                    <p class="text-[11px] text-amber-700 mt-1">依裝置容量加權之等效日照時數</p>
+                </div>
+
+                <div class="bg-gradient-to-br from-brand-600 to-brand-800 p-4 rounded-xl text-white shadow-md">
+                    <div class="flex items-center justify-between text-brand-100 text-xs font-bold mb-1">
+                        <span>反推全年累計峰瓦值</span>
+                        <i data-lucide="calendar-check" class="w-4 h-4 text-solar-400"></i>
+                    </div>
+                    <div class="flex items-baseline space-x-1">
+                        <span id="kpiMapAvgAnnualYield" class="text-2xl font-black">0</span>
+                        <span class="text-xs font-semibold text-brand-100">kWh/kWp/年</span>
+                    </div>
+                    <p id="kpiMapAvgMonthlySub" class="text-[11px] text-brand-200 mt-1">全年月均：0.0 kWh/kWp/月</p>
+                </div>
+
+                <div class="bg-white p-4 rounded-xl border border-emerald-200 shadow-sm col-span-2 lg:col-span-1">
+                    <div class="flex items-center justify-between text-emerald-800 text-xs font-bold mb-1">
+                        <span>最高峰瓦效益行政區</span>
+                        <i data-lucide="award" class="w-4 h-4 text-emerald-600"></i>
+                    </div>
+                    <div id="kpiMapTopDistrict" class="text-base font-black text-emerald-900 truncate">-</div>
+                    <p id="kpiMapTopDistrictSub" class="text-[11px] text-emerald-700 font-semibold mt-1">日均 - kWh/kWp/日</p>
+                </div>
+            </div>
+
+            <!-- Interactive Google Maps + Plant Directory Split Panel -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-4 sm:p-5 border-b border-slate-200 bg-slate-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+                            <i data-lucide="map-pinned" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-black text-slate-900">太陽能案場 Google Maps 衛星定位與快速尋場中心</h2>
+                            <p class="text-xs text-slate-500">點選左側任一案場即可自動切入 Google Maps 衛星空拍／街道定位，或一鍵開啟 Google 外部導航與街景</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="inline-flex rounded-xl p-0.5 bg-slate-200/80 border border-slate-300 text-xs">
+                            <button id="btnMapTypeSat" type="button" onclick="setEmbeddedMapType('h')" class="px-3 py-1.5 rounded-lg font-bold bg-white text-slate-900 shadow-sm transition">
+                                🛰️ 衛星空拍圖 (推薦)
+                            </button>
+                            <button id="btnMapTypeRoad" type="button" onclick="setEmbeddedMapType('m')" class="px-3 py-1.5 rounded-lg font-semibold text-slate-600 hover:text-slate-900 transition">
+                                🗺️ 標準街道圖
+                            </button>
+                        </div>
+                        <select id="mapZoomSelect" onchange="setEmbeddedMapZoom(this.value)" class="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-300 bg-white text-slate-700">
+                            <option value="15">縮放 15x (區鄉鎮級)</option>
+                            <option value="17" selected>縮放 17x (案場特寫)</option>
+                            <option value="18">縮放 18x (屋頂模組級)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-200">
+                    <!-- Left: Searchable Plant Locator List (5 cols) -->
+                    <div class="lg:col-span-5 flex flex-col h-[540px] bg-slate-50/40">
+                        <div class="p-3.5 border-b border-slate-200 bg-white space-y-2.5">
+                            <div class="relative">
+                                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                                <input
+                                    type="text"
+                                    id="mapPlantSearchInput"
+                                    oninput="renderMapPlantCards()"
+                                    placeholder="搜尋案場名稱、縣市、區鄉鎮、路名或地號..."
+                                    class="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-slate-50 focus:bg-white"
+                                />
+                            </div>
+                            <div id="mapCityQuickPills" class="flex flex-wrap gap-1.5">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+
+                        <div id="mapPlantCardsList" class="flex-1 overflow-y-auto p-3 space-y-2.5">
+                            <!-- Plant cards dynamically rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Right: Embedded Google Maps Viewer + Selected Plant 1-12M Mini Bar (7 cols) -->
+                    <div class="lg:col-span-7 flex flex-col bg-white">
+                        <!-- Active Plant Map Header Bar -->
+                        <div class="p-3.5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white">
+                            <div class="min-w-0">
+                                <div class="flex items-center space-x-2">
+                                    <span id="activeMapPlantBadge" class="px-2 py-0.5 text-[11px] font-bold rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200">高雄市 · 岡山區</span>
+                                    <h3 id="activeMapPlantTitle" class="text-sm font-black text-slate-900 truncate">五甲尾 太陽能電廠</h3>
+                                    <span id="activeMapPlantCap" class="text-xs font-mono font-bold text-brand-700">4,999.20 kWp</span>
+                                </div>
+                                <p id="activeMapPlantAddr" class="text-xs text-slate-500 mt-0.5 truncate">📍 高雄市岡山區嘉興段344、344-2等 (五甲尾滯洪池)</p>
+                            </div>
+                            <div class="flex items-center space-x-2 flex-shrink-0">
+                                <a id="activeMapExternalBtn" href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm transition">
+                                    <i data-lucide="navigation" class="w-3.5 h-3.5"></i>
+                                    <span>Google Maps 導航 / 街景</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Embedded Google Maps Iframe -->
+                        <div class="relative flex-1 min-h-[340px] bg-slate-100">
+                            <iframe
+                                id="googleMapEmbedFrame"
+                                class="w-full h-full min-h-[340px] border-0"
+                                loading="lazy"
+                                referrerpolicy="no-referrer-when-downgrade"
+                                src="https://maps.google.com/maps?q=22.8286,120.3125&t=h&z=17&hl=zh-TW&output=embed"
+                                allowfullscreen
+                            ></iframe>
+                        </div>
+
+                        <!-- Selected Plant 1~12 Month Mini Yield Bar Chart -->
+                        <div class="p-3.5 bg-slate-50 border-t border-slate-200">
+                            <div class="flex items-center justify-between mb-2">
+                                <span id="activeMapYieldTitle" class="text-xs font-bold text-slate-700 flex items-center space-x-1.5">
+                                    <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 text-amber-500"></i>
+                                    <span>本案場 1~12 個月反推日均峰瓦值 (kWh/kWp/日)</span>
+                                </span>
+                                <div class="flex items-center space-x-3 text-[11px]">
+                                    <span class="inline-flex items-center"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block mr-1"></span>電費單實測</span>
+                                    <span class="inline-flex items-center"><span class="w-2.5 h-2.5 rounded-sm bg-brand-400 inline-block mr-1"></span>區鄉鎮季節反推</span>
+                                    <strong id="activeMapYieldSummary" class="text-slate-900 font-mono">全年平均: - kWh/kWp/日</strong>
+                                </div>
+                            </div>
+                            <div id="activeMapMiniBars" class="grid grid-cols-12 gap-1.5 items-end h-20 pt-3 px-1 bg-white rounded-xl border border-slate-200 p-2">
+                                <!-- 12 month bars rendered here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== TAIWAN DISTRICT/TOWNSHIP & PLANT 1~12 MONTH kWh/kWp TABLES ==================== -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-emerald-50/40 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-brand-100 text-brand-800">台灣「縣市 · 區 / 鄉 / 鎮」Level 基準</span>
+                            <span class="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-amber-100 text-amber-800">電費單度數反推引擎</span>
+                        </div>
+                        <h3 class="text-base sm:text-lg font-black text-slate-900 mt-1">
+                            各區鄉鎮 ＆ 案場「1 ~ 12 個月及全年平均峰瓦值 (kWh/kWp)」反推分析表
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            依據上傳電費單之「購電度數 (kWh) ÷ 裝置容量 (kWp) ÷ 計費期間涵蓋日數」自動切分跨月並合併同場轉供度數，反推 1~12 月與全年平均峰瓦值
+                        </p>
+                    </div>
+
+                    <!-- Controls Bar -->
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">峰瓦值顯示單位</label>
+                            <select id="yieldUnitSelect" onchange="renderYieldTables()" class="px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-300 bg-white text-slate-800 focus:ring-2 focus:ring-brand-500">
+                                <option value="daily" selected>☀️ 日均峰瓦值 (kWh/kWp/日，DMY)</option>
+                                <option value="monthly">📅 月累積峰瓦值 (kWh/kWp/月)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">未上傳月份推估模式</label>
+                            <select id="yieldEstModeSelect" onchange="renderYieldTables()" class="px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-300 bg-white text-slate-800 focus:ring-2 focus:ring-brand-500">
+                                <option value="full12" selected>🧠 電費單實測 ＋ 區鄉鎮日照曲線反推滿 1~12 月</option>
+                                <option value="actual_only">📋 僅顯示已上傳電費單之實測月份</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">縣市篩選</label>
+                            <select id="yieldCityFilter" onchange="renderYieldTables()" class="px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-300 bg-white text-slate-800 focus:ring-2 focus:ring-brand-500">
+                                <option value="">所有縣市 (全部區鄉鎮)</option>
+                            </select>
+                        </div>
+                        <div class="pt-3.5">
+                            <button type="button" onclick="exportYieldAnalysisExcel()" class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-xl transition shadow-sm">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                <span>匯出 Excel</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub-Table 1: District / Township Level (台灣「區、鄉鎮」Level 基準彙整表) -->
+                <div class="p-4 sm:p-5 border-b border-slate-200">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-5 rounded-full bg-emerald-600 inline-block"></span>
+                            <h4 class="text-sm font-black text-slate-900">表一：以台灣「縣市 · 區／鄉／鎮」為基準之 1~12 個月及全年平均峰瓦值 (kWh/kWp)</h4>
+                        </div>
+                        <div class="flex items-center space-x-3 text-xs">
+                            <span class="inline-flex items-center text-emerald-700 font-semibold"><span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span>綠底實心：電費單實測反推</span>
+                            <span class="inline-flex items-center text-brand-700 font-semibold"><span class="w-2 h-2 rounded-full bg-brand-400 mr-1.5"></span>藍字虛線：依該區鄉鎮實測錨點＋季節日照曲線反推</span>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-800 text-white font-bold text-[11px] whitespace-nowrap">
+                                    <th class="py-2.5 px-3 sticky left-0 bg-slate-800 z-10">縣市 · 區 / 鄉 / 鎮</th>
+                                    <th class="py-2.5 px-2.5 text-center">案場數</th>
+                                    <th class="py-2.5 px-2.5 text-right">裝置容量 (kWp)</th>
+                                    <th class="py-2.5 px-2 text-right">1月</th>
+                                    <th class="py-2.5 px-2 text-right">2月</th>
+                                    <th class="py-2.5 px-2 text-right">3月</th>
+                                    <th class="py-2.5 px-2 text-right">4月</th>
+                                    <th class="py-2.5 px-2 text-right">5月</th>
+                                    <th class="py-2.5 px-2 text-right">6月</th>
+                                    <th class="py-2.5 px-2 text-right">7月</th>
+                                    <th class="py-2.5 px-2 text-right">8月</th>
+                                    <th class="py-2.5 px-2 text-right">9月</th>
+                                    <th class="py-2.5 px-2 text-right">10月</th>
+                                    <th class="py-2.5 px-2 text-right">11月</th>
+                                    <th class="py-2.5 px-2 text-right">12月</th>
+                                    <th class="py-2.5 px-3 text-right bg-amber-600 text-white">全年日均<br><span class="text-[10px] font-normal">(kWh/kWp/日)</span></th>
+                                    <th class="py-2.5 px-3 text-right bg-brand-700 text-white">全年月均<br><span class="text-[10px] font-normal">(kWh/kWp/月)</span></th>
+                                    <th class="py-2.5 px-3 text-right bg-emerald-700 text-white">反推年總發電<br><span class="text-[10px] font-normal">(kWh/kWp/年)</span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="districtYieldTableBody" class="divide-y divide-slate-200 font-mono text-[11px]">
+                                <!-- Populated by JS -->
+                            </tbody>
+                            <tfoot id="districtYieldTableFoot" class="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300 font-mono text-[11px]">
+                                <!-- Populated by JS -->
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Sub-Table 2: Individual Plant Level (各案場 1~12 個月及全年平均峰瓦值明細表) -->
+                <div class="p-4 sm:p-5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-5 rounded-full bg-brand-600 inline-block"></span>
+                            <h4 class="text-sm font-black text-slate-900">表二：各太陽能案場由電費單反推「1~12 個月及全年平均峰瓦值 (kWh/kWp)」明細表</h4>
+                        </div>
+                        <span class="text-xs text-slate-500">點擊「📍 地圖定位」可立即在上方 Google Maps 檢視該案場位置</span>
+                    </div>
+
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 border-b border-slate-300 font-bold text-[11px] whitespace-nowrap">
+                                    <th class="py-2.5 px-3 sticky left-0 bg-slate-100 z-10">案場名稱 / 電號 / 地圖</th>
+                                    <th class="py-2.5 px-2.5">縣市 · 區鄉鎮</th>
+                                    <th class="py-2.5 px-2.5 text-right">容量 (kWp)</th>
+                                    <th class="py-2.5 px-2 text-center">實單數</th>
+                                    <th class="py-2.5 px-2 text-right">1月</th>
+                                    <th class="py-2.5 px-2 text-right">2月</th>
+                                    <th class="py-2.5 px-2 text-right">3月</th>
+                                    <th class="py-2.5 px-2 text-right">4月</th>
+                                    <th class="py-2.5 px-2 text-right">5月</th>
+                                    <th class="py-2.5 px-2 text-right">6月</th>
+                                    <th class="py-2.5 px-2 text-right">7月</th>
+                                    <th class="py-2.5 px-2 text-right">8月</th>
+                                    <th class="py-2.5 px-2 text-right">9月</th>
+                                    <th class="py-2.5 px-2 text-right">10月</th>
+                                    <th class="py-2.5 px-2 text-right">11月</th>
+                                    <th class="py-2.5 px-2 text-right">12月</th>
+                                    <th class="py-2.5 px-3 text-right bg-amber-50 text-amber-900 border-l border-amber-200">全年日均<br><span class="text-[10px] font-normal">(kWh/kWp/日)</span></th>
+                                    <th class="py-2.5 px-3 text-right bg-brand-50 text-brand-900">全年月均<br><span class="text-[10px] font-normal">(kWh/kWp/月)</span></th>
+                                    <th class="py-2.5 px-3 text-right bg-emerald-50 text-emerald-900">全年累計<br><span class="text-[10px] font-normal">(kWh/kWp/年)</span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="plantYieldTableBody" class="divide-y divide-slate-200 font-mono text-[11px]">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Formula & Methodology Explanation Box -->
+                    <div class="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1.5">
+                        <div class="font-bold text-slate-800 flex items-center space-x-1.5">
+                            <i data-lucide="sparkles" class="w-4 h-4 text-brand-600"></i>
+                            <span>電費單反推「區、鄉鎮 1~12 個月及全年平均峰瓦值 (kWh/kWp)」演算法說明：</span>
+                        </div>
+                        <p>1. <strong>電費單實測度數精準切分與同場整併</strong>：系統讀取每張電費單之「計費期間起訖日 ($D_{\text{start}} \sim D_{\text{end}}$)」、「購電度數 ($\text{kWh}$)」與「裝置容量 ($\text{kWp}$)」。若遇跨月抄表帳單（例如 9/18~10/20 共 33 天），系統會先計算單日發電度數並依實際日曆天數歸入 9 月與 10 月；若同一案場同期間同時具備「台電餘電單」與「綠電轉供計費通知書」（例如路竹永華路 3,907 度 + 52,240 度 = 56,147 度），系統會自動按日疊加總發電度數，不重複計算容量。</p>
+                        <p>2. <strong>單月與全年峰瓦值計算公式</strong>：當月日均峰瓦值 $\text{DMY}_m = \frac{\text{當月總發電度數 kWh}_m}{\text{裝置容量 kWp} \times \text{當月涵蓋天數 } D_m}$ ($\text{kWh/kWp/日}$，即等效滿發日照時數)；當月累積峰瓦值 $\text{MMY}_m = \text{DMY}_m \times \text{當月標準天數}$ ($\text{kWh/kWp/月}$)。</p>
+                        <p>3. <strong>台灣區鄉鎮季節日照曲線反推模型</strong>：當案場僅有部分月份電費單時，系統以已上傳電費單之實測日均峰瓦值 $\text{DMY}_m$ 對照台灣北／中／南／東區鄉鎮 1~12 月太陽輻射季節指數 $w_{\text{region}, m}$，反推校正出該案場之「基準年平均日峰瓦值 $\text{BaseDMY} = \frac{\sum \text{DMY}_m \cdot D_m}{\sum w_{\text{region}, m} \cdot D_m}$」，進而推導出其餘未上傳月份之峰瓦值及全年平均峰瓦值。隨著後續每月新電費單上傳，實測值將自動覆蓋反推值！</p>
+                    </div>
+                </div>
+            </div>
+        </div><!-- End mapYieldView -->
+
     </main>
+
+    <!-- Quick Google Map Modal (Triggered from Bills Table or Preview Modal) -->
+    <div id="quickMapModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
+        <div class="bg-white rounded-2xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden">
+            <div class="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                <div class="flex items-center space-x-3 min-w-0">
+                    <div class="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="map-pin" class="w-5 h-5"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="flex items-center space-x-2">
+                            <span id="quickMapDistrictBadge" class="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-800">-</span>
+                            <h3 id="quickMapTitle" class="text-base font-black text-slate-900 truncate">案場地圖定位</h3>
+                        </div>
+                        <p id="quickMapAddress" class="text-xs text-slate-500 truncate mt-0.5">-</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2 flex-shrink-0">
+                    <button type="button" onclick="switchQuickMapType('h')" id="quickMapBtnSat" class="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-slate-800 text-white">🛰️ 衛星圖</button>
+                    <button type="button" onclick="switchQuickMapType('m')" id="quickMapBtnRoad" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-white text-slate-700 border border-slate-300">🗺️ 街道圖</button>
+                    <a id="quickMapExternalLink" href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm">
+                        <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                        <span>開啟 Google Maps 導航</span>
+                    </a>
+                    <button type="button" onclick="closeQuickMapModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="relative h-[460px] bg-slate-100">
+                <iframe id="quickMapIframe" class="w-full h-full border-0" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+            </div>
+            <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <div id="quickMapYieldInfo" class="font-semibold text-slate-700">-</div>
+                <button type="button" id="quickMapJumpFullBtn" class="inline-flex items-center space-x-1 text-brand-700 hover:text-brand-900 font-bold">
+                    <span>前往「區鄉鎮 1~12 月峰瓦值 (kWh/kWp) 反推分析頁」查看完整報表</span>
+                    <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Supabase Settings Modal -->
     <div id="supabaseSettingsModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm hidden">
@@ -773,7 +1142,19 @@
                                 <input type="text" id="fieldTaxId" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
                             </div>
                             <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200 col-span-2">
-                                <span class="text-slate-400 block mb-0.5">案場設置地點</span>
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-slate-400">案場設置地點</span>
+                                    <div class="flex items-center space-x-1.5">
+                                        <button type="button" id="modalQuickMapBtn" class="inline-flex items-center space-x-1 px-2 py-0.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition">
+                                            <i data-lucide="map-pin" class="w-3 h-3"></i>
+                                            <span>衛星定位</span>
+                                        </button>
+                                        <a id="modalGoogleMapBtn" href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1 px-2 py-0.5 text-[11px] font-bold text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-md transition">
+                                            <i data-lucide="navigation" class="w-3 h-3"></i>
+                                            <span>Google 導航</span>
+                                        </a>
+                                    </div>
+                                </div>
                                 <input type="text" id="fieldLocation" class="w-full font-semibold text-slate-800 bg-transparent border-0 p-0 focus:ring-0" readonly>
                             </div>
                             <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
@@ -1185,6 +1566,9 @@
             if (typeof initOmCalculator === 'function') {
                 initOmCalculator();
             }
+            if (typeof refreshMapAndYieldAnalytics === 'function') {
+                refreshMapAndYieldAnalytics();
+            }
         }
 
         async function fetchKPIs() {
@@ -1316,7 +1700,11 @@
                     const kwhStr = b.total_kwh ? Math.round(b.total_kwh).toLocaleString() : '-';
                     const capacityStr = b.installed_capacity_kw ? Number(b.installed_capacity_kw).toFixed(2) : '-';
                     const rateStr = b.fit_rate ? Number(b.fit_rate).toFixed(4) : '-';
-                    const cityBadge = b.city ? `<span class="inline-block ml-1 px-1.5 py-0.5 text-[10px] rounded font-semibold bg-slate-100 text-slate-600 border border-slate-200">${b.city}</span>` : '';
+                    const mapInfo = typeof getPlantMapInfo === 'function' ? getPlantMapInfo(b) : { city: b.city || '', district: b.district || '', externalUrl: 'https://www.google.com/maps' };
+                    const regionLabel = [mapInfo.city, mapInfo.district].filter(Boolean).join(' · ');
+                    const cityBadge = regionLabel ? `<span class="inline-block px-1.5 py-0.5 text-[10px] rounded font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">${regionLabel}</span>` : '';
+                    const billYield = typeof getSingleBillYieldInfo === 'function' ? getSingleBillYieldInfo(b) : null;
+                    const yieldSubBadge = billYield ? `<span class="block text-[10px] font-mono text-amber-700 mt-0.5" title="由本期電費單反推：${billYield.mmy.toFixed(1)} kWh/kWp/期 (${billYield.days}天)">⚡ ${billYield.dmy.toFixed(2)} kWh/kWp/日</span>` : '';
 
                     return `
                         <tr class="hover:bg-slate-50/80 transition group">
@@ -1335,12 +1723,26 @@
                                 <span class="font-semibold text-slate-900 block">${b.customer_name || '-'}</span>
                                 <span class="text-xs text-slate-400 block">統編: ${b.tax_id || '-'}</span>
                             </td>
-                            <td class="py-3 px-4 max-w-xs truncate" title="${b.plant_location || ''}">
-                                <div class="text-slate-800 text-xs">${b.plant_location || '-'} ${cityBadge}</div>
-                                <span class="text-[11px] text-slate-400">${b.taipower_branch || ''}</span>
+                            <td class="py-3 px-4 max-w-xs" title="${b.plant_location || ''}">
+                                <div class="flex items-center flex-wrap gap-1 mb-0.5">
+                                    ${cityBadge}
+                                    <button type="button" onclick="openQuickMapModal(${idx})" class="inline-flex items-center space-x-0.5 px-1.5 py-0.5 text-[10px] font-bold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded border border-brand-200 transition cursor-pointer" title="站內開啟 Google Maps 衛星定位">
+                                        <i data-lucide="map-pin" class="w-2.5 h-2.5"></i>
+                                        <span>地圖定位</span>
+                                    </button>
+                                    <a href="${mapInfo.externalUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition" title="在 Google Maps 開啟導航">
+                                        <i data-lucide="navigation" class="w-2.5 h-2.5"></i>
+                                        <span>導航</span>
+                                    </a>
+                                </div>
+                                <div class="text-slate-800 text-xs truncate">${b.plant_location || '-'}</div>
+                                <span class="text-[11px] text-slate-400 block truncate">${b.taipower_branch || ''}</span>
                             </td>
                             <td class="py-3 px-4 text-right font-medium text-slate-700">${capacityStr}</td>
-                            <td class="py-3 px-4 text-right font-semibold text-slate-900">${kwhStr}</td>
+                            <td class="py-3 px-4 text-right font-semibold text-slate-900">
+                                <span>${kwhStr}</span>
+                                ${yieldSubBadge}
+                            </td>
                             <td class="py-3 px-4 text-right text-xs text-slate-600 font-mono">${rateStr}</td>
                             <td class="py-3 px-4 text-right">
                                 <span class="font-bold text-brand-700 text-sm">NT$ ${payableStr}</span>
@@ -1561,6 +1963,9 @@
                 plant_location: '高雄市岡山區嘉興段344、344-2等 (五甲尾滯洪池)',
                 city: '高雄市',
                 district: '岡山區',
+                lat: 22.8286,
+                lng: 120.3125,
+                map_query: '22.8286,120.3125',
                 installed_capacity_kw: 4999.2,
                 fit_rate: 4.8529,
                 taipower_branch: '高雄區營業處'
@@ -1573,6 +1978,9 @@
                 plant_location: '彰化縣鹿港鎮彰濱工業區鹿工路6號',
                 city: '彰化縣',
                 district: '鹿港鎮',
+                lat: 24.0685,
+                lng: 120.3976,
+                map_query: '彰化縣鹿港鎮鹿工路6號',
                 installed_capacity_kw: 1628.9,
                 fit_rate: 4.2444,
                 taipower_branch: '彰化區營業處'
@@ -1585,6 +1993,9 @@
                 plant_location: '彰化縣大城鄉頂莊段0453-0000地號',
                 city: '彰化縣',
                 district: '大城鄉',
+                lat: 23.8562,
+                lng: 120.2865,
+                map_query: '23.8562,120.2865',
                 installed_capacity_kw: 196.62,
                 fit_rate: 4.8111,
                 taipower_branch: '彰化區營業處'
@@ -1597,6 +2008,9 @@
                 plant_location: '桃園市蘆竹區南工路41號（屋頂）一場',
                 city: '桃園市',
                 district: '蘆竹區',
+                lat: 25.0588,
+                lng: 121.2692,
+                map_query: '桃園市蘆竹區南工路41號',
                 installed_capacity_kw: 1943.50,
                 fit_rate: 5.0921,
                 taipower_branch: '桃園區營業處'
@@ -1609,6 +2023,9 @@
                 plant_location: '高雄市大寮區磚子磘段3362-1、3363~3374地號',
                 city: '高雄市',
                 district: '大寮區',
+                lat: 22.6178,
+                lng: 120.4182,
+                map_query: '22.6178,120.4182',
                 installed_capacity_kw: 693.00,
                 fit_rate: 4.6983,
                 taipower_branch: '鳳山區營業處'
@@ -1621,6 +2038,9 @@
                 plant_location: '高雄市小港區同利路20號',
                 city: '高雄市',
                 district: '小港區',
+                lat: 22.5535,
+                lng: 120.3632,
+                map_query: '高雄市小港區同利路20號',
                 installed_capacity_kw: 744.25,
                 fit_rate: 4.2968,
                 taipower_branch: '鳳山區營業處'
@@ -1633,6 +2053,9 @@
                 plant_location: '宜蘭縣蘇澳鎮新馬南路36號',
                 city: '宜蘭縣',
                 district: '蘇澳鎮',
+                lat: 24.6195,
+                lng: 121.8258,
+                map_query: '宜蘭縣蘇澳鎮新馬南路36號',
                 installed_capacity_kw: 276.48,
                 fit_rate: 5.163,
                 taipower_branch: '宜蘭區營業處'
@@ -1645,6 +2068,9 @@
                 plant_location: '高雄市路竹區永華路98、102號',
                 city: '高雄市',
                 district: '路竹區',
+                lat: 22.8632,
+                lng: 120.2584,
+                map_query: '高雄市路竹區永華路98號',
                 installed_capacity_kw: 499.40,
                 fit_rate: 4.8056,
                 taipower_branch: '高雄區營業處'
@@ -2625,6 +3051,13 @@
             document.getElementById('fieldCustomerName').value = b.customer_name || '';
             document.getElementById('fieldTaxId').value = b.tax_id || '';
             document.getElementById('fieldLocation').value = b.plant_location || '';
+            if (typeof getPlantMapInfo === 'function') {
+                const mInfo = getPlantMapInfo(b);
+                const gBtn = document.getElementById('modalGoogleMapBtn');
+                const qBtn = document.getElementById('modalQuickMapBtn');
+                if (gBtn) gBtn.href = mInfo.externalUrl;
+                if (qBtn) qBtn.onclick = () => openQuickMapModal(index);
+            }
             document.getElementById('fieldBillMonth').value = b.bill_year_month || '';
             document.getElementById('fieldBillingPeriod').value = b.billing_period || '';
 
@@ -2839,23 +3272,39 @@
         function switchMainView(view) {
             const tabBills = document.getElementById('navTabBills');
             const tabCalc = document.getElementById('navTabCalculator');
+            const tabMapYield = document.getElementById('navTabMapYield');
             const billsView = document.getElementById('billsView');
             const calcView = document.getElementById('calculatorView');
+            const mapYieldView = document.getElementById('mapYieldView');
             const topActions = document.getElementById('calculatorTopActions');
+            const mapTopActions = document.getElementById('mapYieldTopActions');
+
+            const inactiveCls = "inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-white text-slate-700 hover:bg-slate-50 border border-slate-200";
+            const activeCls = "inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-brand-600 text-white";
+
+            billsView.classList.add('hidden');
+            calcView.classList.add('hidden');
+            if (mapYieldView) mapYieldView.classList.add('hidden');
+            topActions.classList.add('hidden');
+            if (mapTopActions) mapTopActions.classList.add('hidden');
+
+            tabBills.className = inactiveCls;
+            tabCalc.className = inactiveCls;
+            if (tabMapYield) tabMapYield.className = inactiveCls;
 
             if (view === 'calculator') {
-                billsView.classList.add('hidden');
                 calcView.classList.remove('hidden');
-                tabBills.className = "inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-white text-slate-700 hover:bg-slate-50 border border-slate-200";
-                tabCalc.className = "inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-brand-600 text-white";
+                tabCalc.className = activeCls;
                 topActions.classList.remove('hidden');
                 initOmCalculator();
+            } else if (view === 'mapyield') {
+                if (mapYieldView) mapYieldView.classList.remove('hidden');
+                if (tabMapYield) tabMapYield.className = activeCls;
+                if (mapTopActions) mapTopActions.classList.remove('hidden');
+                refreshMapAndYieldAnalytics();
             } else {
                 billsView.classList.remove('hidden');
-                calcView.classList.add('hidden');
-                tabBills.className = "inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-brand-600 text-white";
-                tabCalc.className = "inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-white text-slate-700 hover:bg-slate-50 border border-slate-200";
-                topActions.classList.add('hidden');
+                tabBills.className = activeCls;
             }
             lucide.createIcons();
         }
@@ -3399,6 +3848,891 @@
                 showToast('已匯出 CSV 試算表！');
             }
         }
+
+        // =============================================================
+        // 案場位置 Google Maps 整合 ＆ 台灣「區、鄉鎮」基準 1~12 個月峰瓦值 (kWh/kWp) 反推引擎
+        // =============================================================
+        let currentEmbeddedMapType = 'h'; // 'h' = Hybrid Satellite, 'm' = Roadmap
+        let currentEmbeddedMapZoom = 17;
+        let selectedMapPlantKey = '11-63-0824-95-9';
+        let selectedMapCityFilter = '';
+        let quickMapCurrentQuery = '';
+        let quickMapCurrentType = 'h';
+        let cachedYieldAnalytics = null;
+
+        // 台灣各區域 1~12 月太陽光電日照季節指數 (Annual Mean = 1.000)
+        // 依據能源署與中央氣象署北、中、南、東各區日照時數與 PV 實績曲線校正
+        const TAIWAN_SOLAR_SEASONALITY = {
+            // 南台灣 (高雄市、台南市、屏東縣、嘉義縣市)：冬春季乾燥少雨日照強，6~8月午後雷陣雨略減，9~10月秋高氣爽
+            south: [0.85, 0.96, 1.06, 1.12, 1.10, 1.04, 1.09, 1.02, 1.05, 1.01, 0.88, 0.82],
+            // 中台灣 (彰化縣、台中市、雲林縣、南投縣、苗栗縣)：夏秋日照極佳，冬季略受東北季風雲系影響
+            central: [0.76, 0.85, 0.98, 1.09, 1.13, 1.14, 1.22, 1.14, 1.11, 0.99, 0.84, 0.75],
+            // 北台灣 (桃園市、新竹縣市、新北市、台北市、基隆市)：夏秋高，冬春受東北季風影響較明顯
+            north: [0.58, 0.68, 0.85, 1.04, 1.15, 1.24, 1.42, 1.35, 1.16, 0.92, 0.72, 0.59],
+            // 東北部 / 宜蘭花蓮台東 (宜蘭縣、花蓮縣、台東縣)：夏季極高、冬季多雨
+            east: [0.55, 0.65, 0.84, 1.05, 1.16, 1.28, 1.46, 1.38, 1.14, 0.89, 0.69, 0.56]
+        };
+
+        const STANDARD_MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+        function getRegionGroupByCity(city) {
+            if (!city) return 'south';
+            if (/高雄|台南|臺南|屏東|嘉義|澎湖/.test(city)) return 'south';
+            if (/彰化|台中|臺中|雲林|南投|苗栗/.test(city)) return 'central';
+            if (/桃園|新竹|台北|臺北|新北|基隆/.test(city)) return 'north';
+            if (/宜蘭|花蓮|台東|臺東/.test(city)) return 'east';
+            return 'south';
+        }
+
+        // 從地址自動解析「縣市 (city)」與「區/鄉/鎮/市 (district)」
+        function extractCityAndDistrict(billOrPlant) {
+            const elec = billOrPlant.electric_number || '';
+            const known = KNOWN_PLANTS[elec] || {};
+            let city = billOrPlant.city || known.city || '';
+            let district = billOrPlant.district || known.district || '';
+            const addr = billOrPlant.plant_location || known.plant_location || '';
+
+            if (!city || !district) {
+                const m = addr.match(/([一-龥]{2}[縣市])([一-龥]{1,3}[區鄉鎮市])/);
+                if (m) {
+                    if (!city) city = m[1];
+                    if (!district) district = m[2];
+                }
+            }
+            return {
+                city: city || '未分區',
+                district: district || '一般區',
+                fullDistrict: `${city || '未分區'} ${district || ''}`.trim()
+            };
+        }
+
+        // 產生 Google Maps 最佳查詢字串與嵌入 / 外部連結
+        function getPlantMapInfo(billOrPlant) {
+            const elec = billOrPlant.electric_number || '';
+            const known = KNOWN_PLANTS[elec] || {};
+            const { city, district, fullDistrict } = extractCityAndDistrict(billOrPlant);
+            const rawLocation = billOrPlant.plant_location || known.plant_location || '';
+            const siteName = billOrPlant.site_name || known.site_name || elec || '太陽能案場';
+
+            // 1. 優先採用已知精確座標或優化地址 (避免地號如 3362-1 導致 Google Maps 找不到)
+            let query = known.map_query || '';
+            if (!query) {
+                if (known.lat && known.lng) {
+                    query = `${known.lat},${known.lng}`;
+                } else if (rawLocation) {
+                    // 清理地號與括號附註，保留縣市區鄉鎮與道路/地段名稱
+                    let cleaned = rawLocation
+                        .replace(/（[^）]*）/g, '')
+                        .replace(/\([^)]*\)/g, '')
+                        .replace(/[0-9~、,-]+地號.*$/g, '')
+                        .replace(/段[0-9~、,-]+等.*$/g, '段')
+                        .replace(/([0-9]+)號[、,][0-9]+號/g, '$1號')
+                        .trim();
+                    query = cleaned || `${city}${district}`;
+                } else {
+                    query = `${city}${district} ${siteName}`;
+                }
+            }
+
+            const embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(query)}&t=${currentEmbeddedMapType}&z=${currentEmbeddedMapZoom}&hl=zh-TW&output=embed`;
+            const externalSearchQuery = (known.lat && known.lng)
+                ? `${known.lat},${known.lng}`
+                : (rawLocation ? rawLocation.replace(/（[^）]*）/g, '').trim() : query);
+            const externalUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(externalSearchQuery)}`;
+
+            return {
+                electric_number: elec,
+                site_name: siteName,
+                city,
+                district,
+                fullDistrict,
+                plant_location: rawLocation || `${city}${district}`,
+                query,
+                embedUrl,
+                externalUrl
+            };
+        }
+
+        // 解析單筆電費單之起訖西元日期與天數
+        function parseBillDateRange(b) {
+            let bStart = null;
+            let bEnd = null;
+
+            if (b.billing_start_ad && b.billing_end_ad) {
+                bStart = new Date(b.billing_start_ad + 'T00:00:00');
+                bEnd = new Date(b.billing_end_ad + 'T00:00:00');
+            } else if (b.billing_period) {
+                const m = b.billing_period.match(/([0-9]{2,3})年([0-9]{1,2})月([0-9]{1,2})日\s*[~-]\s*([0-9]{2,3})年([0-9]{1,2})月([0-9]{1,2})日/);
+                if (m) {
+                    bStart = new Date(parseInt(m[1]) + 1911, parseInt(m[2]) - 1, parseInt(m[3]));
+                    bEnd = new Date(parseInt(m[4]) + 1911, parseInt(m[5]) - 1, parseInt(m[6]));
+                }
+            }
+
+            if ((!bStart || !bEnd || isNaN(bStart.getTime()) || isNaN(bEnd.getTime())) && b.bill_year_month_ad) {
+                const parts = b.bill_year_month_ad.split('-').map(Number);
+                if (parts.length === 2 && parts[0] > 2000) {
+                    // 台電帳單期別通常計費期間為前一個月
+                    const prevMonthDate = new Date(parts[0], parts[1] - 2, 1);
+                    bStart = new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth(), 1);
+                    bEnd = new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth() + 1, 0);
+                }
+            }
+
+            if (!bStart || !bEnd || isNaN(bStart.getTime()) || isNaN(bEnd.getTime())) return null;
+            const days = Math.max(1, Math.round((bEnd.getTime() - bStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+            return { bStart, bEnd, days };
+        }
+
+        // 計算單筆電費單之日均峰瓦值 (kWh/kWp/日) 與當期峰瓦值 (kWh/kWp/期)
+        function getSingleBillYieldInfo(b) {
+            const known = KNOWN_PLANTS[b.electric_number] || {};
+            const cap = Number(b.installed_capacity_kw || known.installed_capacity_kw || 0);
+            const kwh = Number(b.total_kwh || 0);
+            if (!cap || cap <= 0 || !kwh || kwh <= 0) return null;
+
+            const range = parseBillDateRange(b);
+            const days = range ? range.days : 30;
+            const mmy = kwh / cap;
+            const dmy = mmy / days;
+            return { cap, kwh, days, dmy, mmy };
+        }
+
+        // 核心演算法：由所有電費單反推每個案場＆每個「縣市+區鄉鎮」的 1~12 個月及全年平均峰瓦值 (kWh/kWp)
+        function buildDistrictAndPlantYieldAnalytics() {
+            const plantMap = new Map();
+
+            // 1. 先將已知案場與現有電費單案場建立清單
+            for (const [elec, p] of Object.entries(KNOWN_PLANTS)) {
+                const mapInfo = getPlantMapInfo({ ...p, electric_number: elec });
+                plantMap.set(elec, {
+                    electric_number: elec,
+                    site_name: p.site_name,
+                    customer_name: p.customer_name,
+                    city: mapInfo.city,
+                    district: mapInfo.district,
+                    fullDistrict: mapInfo.fullDistrict,
+                    plant_location: mapInfo.plant_location,
+                    capacity_kwp: Number(p.installed_capacity_kw || 0),
+                    fit_rate: Number(p.fit_rate || 0),
+                    mapInfo,
+                    bills: [],
+                    dailyKwhMap: new Map() // key: "YYYY-MM-DD" -> total kWh on that day (combines Taipower + CPPA wheeling bills on same dates!)
+                });
+            }
+
+            const billsSource = (currentBills && currentBills.length > 0) ? currentBills : [];
+            billsSource.forEach(b => {
+                const elec = b.electric_number || b.site_name || `PLANT_${b.id}`;
+                if (!plantMap.has(elec)) {
+                    const mapInfo = getPlantMapInfo(b);
+                    plantMap.set(elec, {
+                        electric_number: elec,
+                        site_name: b.site_name || elec,
+                        customer_name: b.customer_name || '-',
+                        city: mapInfo.city,
+                        district: mapInfo.district,
+                        fullDistrict: mapInfo.fullDistrict,
+                        plant_location: mapInfo.plant_location,
+                        capacity_kwp: Number(b.installed_capacity_kw || 0),
+                        fit_rate: Number(b.fit_rate || 0),
+                        mapInfo,
+                        bills: [],
+                        dailyKwhMap: new Map()
+                    });
+                }
+
+                const p = plantMap.get(elec);
+                if (!p.capacity_kwp && b.installed_capacity_kw) {
+                    p.capacity_kwp = Number(b.installed_capacity_kw);
+                }
+                p.bills.push(b);
+
+                const kwh = Number(b.total_kwh || 0);
+                const range = parseBillDateRange(b);
+                if (kwh > 0 && range) {
+                    const dailyKwh = kwh / range.days;
+                    const cur = new Date(range.bStart.getTime());
+                    while (cur.getTime() <= range.bEnd.getTime()) {
+                        const y = cur.getFullYear();
+                        const m = String(cur.getMonth() + 1).padStart(2, '0');
+                        const d = String(cur.getDate()).padStart(2, '0');
+                        const dayKey = `${y}-${m}-${d}`;
+                        p.dailyKwhMap.set(dayKey, (p.dailyKwhMap.get(dayKey) || 0) + dailyKwh);
+                        cur.setDate(cur.getDate() + 1);
+                    }
+                }
+            });
+
+            // 2. 針對每個案場計算 1~12 月實測峰瓦值與區鄉鎮季節反推峰瓦值
+            const plantAnalyticsList = [];
+            plantMap.forEach(p => {
+                const cap = p.capacity_kwp || 1;
+                const regionGroup = getRegionGroupByCity(p.city);
+                const seasonWeights = TAIWAN_SOLAR_SEASONALITY[regionGroup] || TAIWAN_SOLAR_SEASONALITY.south;
+
+                // 統計 1~12 月 (index 0..11) 的實測發電總度數與實測涵蓋天數
+                const monthSumKwh = new Array(12).fill(0);
+                const monthDayCount = new Array(12).fill(0);
+
+                p.dailyKwhMap.forEach((dayKwh, dayKey) => {
+                    const mIdx = parseInt(dayKey.slice(5, 7), 10) - 1;
+                    if (mIdx >= 0 && mIdx < 12) {
+                        monthSumKwh[mIdx] += dayKwh;
+                        monthDayCount[mIdx] += 1;
+                    }
+                });
+
+                // 計算實測月份的日均峰瓦值 actualDmy[m] (kWh/kWp/日)
+                const actualDmy = new Array(12).fill(null);
+                let weightedActualDmySum = 0;
+                let weightedSeasonSum = 0;
+
+                for (let m = 0; m < 12; m++) {
+                    // 至少涵蓋 3 天以上視為有效實測月份
+                    if (monthDayCount[m] >= 3 && cap > 0) {
+                        actualDmy[m] = (monthSumKwh[m] / monthDayCount[m]) / cap;
+                        weightedActualDmySum += actualDmy[m] * monthDayCount[m];
+                        weightedSeasonSum += seasonWeights[m] * monthDayCount[m];
+                    }
+                }
+
+                // 由實測月份與該區鄉鎮季節曲線反推該案場之「基準年平均日峰瓦值 BaseAnnualDmy」
+                const defaultRegionDmy = regionGroup === 'south' ? 3.65 : (regionGroup === 'central' ? 3.55 : (regionGroup === 'north' ? 3.05 : 2.95));
+                const baseAnnualDmy = weightedSeasonSum > 0
+                    ? (weightedActualDmySum / weightedSeasonSum)
+                    : defaultRegionDmy;
+
+                const months = [];
+                let fullYearKwhPerKwp = 0;
+                let actualOnlyDays = 0;
+                let actualOnlyKwhPerKwp = 0;
+
+                for (let m = 0; m < 12; m++) {
+                    const isActual = actualDmy[m] !== null;
+                    const dmyFull = isActual ? actualDmy[m] : (baseAnnualDmy * seasonWeights[m]);
+                    const mmyFull = dmyFull * STANDARD_MONTH_DAYS[m];
+
+                    fullYearKwhPerKwp += mmyFull;
+                    if (isActual) {
+                        actualOnlyDays += STANDARD_MONTH_DAYS[m];
+                        actualOnlyKwhPerKwp += actualDmy[m] * STANDARD_MONTH_DAYS[m];
+                    }
+
+                    months.push({
+                        month: m + 1,
+                        isActual,
+                        coveredDays: monthDayCount[m],
+                        dmy: dmyFull,              // 反推完整 1~12 月之日均峰瓦 (kWh/kWp/日)
+                        mmy: mmyFull,              // 反推完整 1~12 月之月累積峰瓦 (kWh/kWp/月)
+                        actualDmy: actualDmy[m],   // 僅實測日均峰瓦
+                        actualMmy: isActual ? (actualDmy[m] * STANDARD_MONTH_DAYS[m]) : null
+                    });
+                }
+
+                const annualDmyFull = fullYearKwhPerKwp / 365;
+                const annualMmyFull = fullYearKwhPerKwp / 12;
+                const annualDmyActual = actualOnlyDays > 0 ? (actualOnlyKwhPerKwp / actualOnlyDays) : null;
+                const annualMmyActual = actualOnlyDays > 0 ? (actualOnlyKwhPerKwp / (actualOnlyDays / 30.4167)) : null;
+
+                plantAnalyticsList.push({
+                    ...p,
+                    billCount: p.bills.length,
+                    baseAnnualDmy,
+                    months,
+                    annualDmyFull,
+                    annualMmyFull,
+                    annualTotalFull: fullYearKwhPerKwp,
+                    annualDmyActual,
+                    annualMmyActual,
+                    annualTotalActual: actualOnlyDays > 0 ? (annualDmyActual * 365) : null
+                });
+            });
+
+            // 3. 以台灣「縣市 · 區/鄉/鎮 (fullDistrict)」Level 為基準進行容量加權彙整
+            const districtMap = new Map();
+            plantAnalyticsList.forEach(p => {
+                const key = p.fullDistrict;
+                if (!districtMap.has(key)) {
+                    districtMap.set(key, {
+                        fullDistrict: key,
+                        city: p.city,
+                        district: p.district,
+                        plants: [],
+                        totalCapacityKwp: 0
+                    });
+                }
+                const dGroup = districtMap.get(key);
+                dGroup.plants.push(p);
+                dGroup.totalCapacityKwp += (p.capacity_kwp || 0);
+            });
+
+            const districtAnalyticsList = [];
+            districtMap.forEach(dGroup => {
+                const capSum = dGroup.totalCapacityKwp || 1;
+                const months = [];
+                let fullYearTotal = 0;
+                let actualOnlyDays = 0;
+                let actualOnlyTotal = 0;
+
+                for (let m = 0; m < 12; m++) {
+                    let wDmySum = 0;
+                    let wActualDmySum = 0;
+                    let actualCapSum = 0;
+                    let anyActual = false;
+
+                    dGroup.plants.forEach(p => {
+                        const pCap = p.capacity_kwp || 1;
+                        const mObj = p.months[m];
+                        wDmySum += mObj.dmy * pCap;
+                        if (mObj.isActual) {
+                            anyActual = true;
+                            wActualDmySum += mObj.actualDmy * pCap;
+                            actualCapSum += pCap;
+                        }
+                    });
+
+                    const dmyFull = wDmySum / capSum;
+                    const mmyFull = dmyFull * STANDARD_MONTH_DAYS[m];
+                    const actualDmy = anyActual && actualCapSum > 0 ? (wActualDmySum / actualCapSum) : null;
+                    const actualMmy = actualDmy !== null ? (actualDmy * STANDARD_MONTH_DAYS[m]) : null;
+
+                    fullYearTotal += mmyFull;
+                    if (actualDmy !== null) {
+                        actualOnlyDays += STANDARD_MONTH_DAYS[m];
+                        actualOnlyTotal += actualMmy;
+                    }
+
+                    months.push({
+                        month: m + 1,
+                        isActual: anyActual,
+                        dmy: dmyFull,
+                        mmy: mmyFull,
+                        actualDmy,
+                        actualMmy
+                    });
+                }
+
+                const annualDmyFull = fullYearTotal / 365;
+                const annualMmyFull = fullYearTotal / 12;
+                const annualDmyActual = actualOnlyDays > 0 ? (actualOnlyTotal / actualOnlyDays) : null;
+                const annualMmyActual = actualOnlyDays > 0 ? (actualOnlyTotal / (actualOnlyDays / 30.4167)) : null;
+
+                districtAnalyticsList.push({
+                    ...dGroup,
+                    plantCount: dGroup.plants.length,
+                    months,
+                    annualDmyFull,
+                    annualMmyFull,
+                    annualTotalFull: fullYearTotal,
+                    annualDmyActual,
+                    annualMmyActual,
+                    annualTotalActual: annualDmyActual !== null ? (annualDmyActual * 365) : null
+                });
+            });
+
+            // 依縣市與容量排序
+            districtAnalyticsList.sort((a, b) => b.totalCapacityKwp - a.totalCapacityKwp);
+            plantAnalyticsList.sort((a, b) => b.capacity_kwp - a.capacity_kwp);
+
+            cachedYieldAnalytics = {
+                districts: districtAnalyticsList,
+                plants: plantAnalyticsList
+            };
+            return cachedYieldAnalytics;
+        }
+
+        function refreshMapAndYieldAnalytics() {
+            const data = buildDistrictAndPlantYieldAnalytics();
+            if (!data) return;
+
+            // 1. Update Top KPIs
+            const totalKwp = data.plants.reduce((acc, p) => acc + (p.capacity_kwp || 0), 0);
+            const weightedAnnualTotal = totalKwp > 0
+                ? data.plants.reduce((acc, p) => acc + p.annualTotalFull * (p.capacity_kwp || 0), 0) / totalKwp
+                : 0;
+            const weightedDailyDmy = weightedAnnualTotal / 365;
+            const weightedMonthlyMmy = weightedAnnualTotal / 12;
+
+            const cities = [...new Set(data.districts.map(d => d.city))];
+            const elDistCount = document.getElementById('kpiMapDistrictCount');
+            const elCityList = document.getElementById('kpiMapCityList');
+            const elTotalKwp = document.getElementById('kpiMapTotalKwp');
+            const elPlantCountSub = document.getElementById('kpiMapPlantCountSub');
+            const elAvgDaily = document.getElementById('kpiMapAvgDailyYield');
+            const elAvgAnnual = document.getElementById('kpiMapAvgAnnualYield');
+            const elAvgMonthlySub = document.getElementById('kpiMapAvgMonthlySub');
+            const elTopDist = document.getElementById('kpiMapTopDistrict');
+            const elTopDistSub = document.getElementById('kpiMapTopDistrictSub');
+
+            if (elDistCount) elDistCount.innerText = data.districts.length;
+            if (elCityList) elCityList.innerText = `涵蓋：${cities.join('、')}`;
+            if (elTotalKwp) elTotalKwp.innerText = totalKwp.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if (elPlantCountSub) elPlantCountSub.innerText = `共 ${data.plants.length} 座太陽能案場 ｜ ${currentBills.length} 張電費單`;
+            if (elAvgDaily) elAvgDaily.innerText = weightedDailyDmy.toFixed(2);
+            if (elAvgAnnual) elAvgAnnual.innerText = Math.round(weightedAnnualTotal).toLocaleString();
+            if (elAvgMonthlySub) elAvgMonthlySub.innerText = `全年月均：${weightedMonthlyMmy.toFixed(1)} kWh/kWp/月`;
+
+            if (data.districts.length > 0) {
+                const topD = [...data.districts].sort((a, b) => b.annualDmyFull - a.annualDmyFull)[0];
+                if (elTopDist) elTopDist.innerText = topD.fullDistrict;
+                if (elTopDistSub) elTopDistSub.innerText = `日均 ${topD.annualDmyFull.toFixed(2)} kWh/kWp/日 ｜ 年約 ${Math.round(topD.annualTotalFull).toLocaleString()} kWh/kWp`;
+            }
+
+            // 2. Populate City Filter Dropdown & Quick Pills
+            const cityFilterEl = document.getElementById('yieldCityFilter');
+            if (cityFilterEl) {
+                const prevVal = cityFilterEl.value;
+                cityFilterEl.innerHTML = '<option value="">所有縣市 (全部區鄉鎮)</option>' +
+                    cities.map(c => `<option value="${c}">${c}</option>`).join('');
+                if (cities.includes(prevVal)) cityFilterEl.value = prevVal;
+            }
+
+            const pillsEl = document.getElementById('mapCityQuickPills');
+            if (pillsEl) {
+                const allPills = ['全部', ...cities];
+                pillsEl.innerHTML = allPills.map(c => {
+                    const val = c === '全部' ? '' : c;
+                    const active = selectedMapCityFilter === val;
+                    return `<button type="button" onclick="setMapCityQuickFilter('${val}')" class="px-2.5 py-1 text-[11px] font-bold rounded-lg transition ${active ? 'bg-brand-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">${c}</button>`;
+                }).join('');
+            }
+
+            // 3. Render Left Plant Cards & Focus Selected Plant on Embedded Map
+            renderMapPlantCards();
+            if (!data.plants.some(p => p.electric_number === selectedMapPlantKey) && data.plants.length > 0) {
+                selectedMapPlantKey = data.plants[0].electric_number;
+            }
+            selectPlantOnMap(selectedMapPlantKey, false);
+
+            // 4. Render District & Plant 1~12M Yield Tables
+            renderYieldTables();
+        }
+
+        function setMapCityQuickFilter(cityVal) {
+            selectedMapCityFilter = cityVal;
+            refreshMapAndYieldAnalytics();
+        }
+
+        function renderMapPlantCards() {
+            const container = document.getElementById('mapPlantCardsList');
+            if (!container) return;
+            const data = cachedYieldAnalytics || buildDistrictAndPlantYieldAnalytics();
+            const keyword = (document.getElementById('mapPlantSearchInput')?.value || '').trim().toLowerCase();
+
+            const filtered = data.plants.filter(p => {
+                if (selectedMapCityFilter && p.city !== selectedMapCityFilter) return false;
+                if (!keyword) return true;
+                const hay = `${p.site_name} ${p.electric_number} ${p.city} ${p.district} ${p.plant_location} ${p.customer_name}`.toLowerCase();
+                return hay.includes(keyword);
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="p-8 text-center text-xs text-slate-400">查無符合條件之案場</div>`;
+                return;
+            }
+
+            container.innerHTML = filtered.map(p => {
+                const isSelected = p.electric_number === selectedMapPlantKey;
+                return `
+                    <div onclick="selectPlantOnMap('${p.electric_number}', true)" class="p-3 rounded-xl border transition cursor-pointer ${isSelected ? 'bg-brand-50/90 border-brand-500 ring-2 ring-brand-500/20 shadow-sm' : 'bg-white border-slate-200 hover:border-brand-300 hover:bg-slate-50/60'}">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <div class="flex items-center flex-wrap gap-1.5">
+                                    <span class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-800">${p.fullDistrict}</span>
+                                    <h4 class="text-xs sm:text-sm font-black text-slate-900 truncate">${p.site_name}</h4>
+                                </div>
+                                <p class="text-[11px] font-mono text-brand-700 font-semibold mt-0.5">${p.electric_number} ｜ 容量: ${p.capacity_kwp.toFixed(2)} kWp</p>
+                                <p class="text-[11px] text-slate-500 truncate mt-0.5" title="${p.plant_location}">📍 ${p.plant_location}</p>
+                            </div>
+                            <div class="text-right flex-shrink-0">
+                                <span class="inline-block px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                                    ☀️ ${p.annualDmyFull.toFixed(2)}
+                                </span>
+                                <span class="block text-[10px] text-slate-400 mt-0.5">kWh/kWp/日</span>
+                            </div>
+                        </div>
+                        <div class="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                            <span class="text-slate-500">實測帳單：<strong class="text-slate-700">${p.billCount} 期</strong> ｜ 反推年發電：<strong class="text-emerald-700">${Math.round(p.annualTotalFull).toLocaleString()} kWh/kWp</strong></span>
+                            <a href="${p.mapInfo.externalUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" class="inline-flex items-center space-x-1 text-brand-700 hover:text-brand-900 font-bold">
+                                <i data-lucide="external-link" class="w-3 h-3"></i>
+                                <span>Google 導航</span>
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        function selectPlantOnMap(elecNo, reRenderCards = true) {
+            selectedMapPlantKey = elecNo;
+            const data = cachedYieldAnalytics || buildDistrictAndPlantYieldAnalytics();
+            const p = data.plants.find(item => item.electric_number === elecNo) || data.plants[0];
+            if (!p) return;
+
+            if (reRenderCards) renderMapPlantCards();
+
+            const mapInfo = getPlantMapInfo(p);
+            const badgeEl = document.getElementById('activeMapPlantBadge');
+            const titleEl = document.getElementById('activeMapPlantTitle');
+            const capEl = document.getElementById('activeMapPlantCap');
+            const addrEl = document.getElementById('activeMapPlantAddr');
+            const extBtn = document.getElementById('activeMapExternalBtn');
+            const iframe = document.getElementById('googleMapEmbedFrame');
+
+            if (badgeEl) badgeEl.innerText = p.fullDistrict;
+            if (titleEl) titleEl.innerText = `${p.site_name} (${p.electric_number})`;
+            if (capEl) capEl.innerText = `${p.capacity_kwp.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWp`;
+            if (addrEl) addrEl.innerText = `📍 ${p.plant_location}`;
+            if (extBtn) extBtn.href = mapInfo.externalUrl;
+            if (iframe && iframe.src !== mapInfo.embedUrl) {
+                iframe.src = mapInfo.embedUrl;
+            }
+
+            // Render 12-month mini bars for selected plant
+            const barsEl = document.getElementById('activeMapMiniBars');
+            const sumEl = document.getElementById('activeMapYieldSummary');
+            if (sumEl) {
+                sumEl.innerText = `全年日均: ${p.annualDmyFull.toFixed(2)} kWh/kWp/日 ｜ 年累計: ${Math.round(p.annualTotalFull).toLocaleString()} kWh/kWp/年`;
+            }
+            if (barsEl) {
+                const maxDmy = Math.max(4.8, ...p.months.map(m => m.dmy));
+                barsEl.innerHTML = p.months.map(m => {
+                    const pct = Math.max(14, Math.min(100, Math.round((m.dmy / maxDmy) * 100)));
+                    const barColor = m.isActual ? 'bg-emerald-500' : 'bg-brand-400/80';
+                    return `
+                        <div class="flex flex-col items-center justify-end h-full group relative" title="${m.month}月 (${m.isActual ? '電費單實測' : '區鄉鎮季節反推'}): ${m.dmy.toFixed(2)} kWh/kWp/日 | ${m.mmy.toFixed(1)} kWh/kWp/月">
+                            <span class="text-[9px] font-mono font-bold ${m.isActual ? 'text-emerald-700' : 'text-slate-500'} mb-0.5">${m.dmy.toFixed(2)}</span>
+                            <div class="w-full max-w-[22px] rounded-t ${barColor} transition-all" style="height: ${pct}%"></div>
+                            <span class="text-[9px] font-bold text-slate-600 mt-1">${m.month}月</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        function setEmbeddedMapType(type) {
+            currentEmbeddedMapType = type;
+            const btnSat = document.getElementById('btnMapTypeSat');
+            const btnRoad = document.getElementById('btnMapTypeRoad');
+            if (btnSat && btnRoad) {
+                if (type === 'h') {
+                    btnSat.className = "px-3 py-1.5 rounded-lg font-bold bg-white text-slate-900 shadow-sm transition";
+                    btnRoad.className = "px-3 py-1.5 rounded-lg font-semibold text-slate-600 hover:text-slate-900 transition";
+                } else {
+                    btnRoad.className = "px-3 py-1.5 rounded-lg font-bold bg-white text-slate-900 shadow-sm transition";
+                    btnSat.className = "px-3 py-1.5 rounded-lg font-semibold text-slate-600 hover:text-slate-900 transition";
+                }
+            }
+            selectPlantOnMap(selectedMapPlantKey, false);
+        }
+
+        function setEmbeddedMapZoom(zoomVal) {
+            currentEmbeddedMapZoom = parseInt(zoomVal, 10) || 17;
+            selectPlantOnMap(selectedMapPlantKey, false);
+        }
+
+        function focusPlantOnMapView(elecNo) {
+            closeQuickMapModal();
+            switchMainView('mapyield');
+            if (elecNo) {
+                selectPlantOnMap(elecNo, true);
+                const mapEl = document.getElementById('googleMapEmbedFrame');
+                if (mapEl) mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        // 繪製表一（台灣區鄉鎮基準 1~12 月峰瓦值）與表二（各案場 1~12 月峰瓦值）
+        function renderYieldTables() {
+            const data = cachedYieldAnalytics || buildDistrictAndPlantYieldAnalytics();
+            const unit = document.getElementById('yieldUnitSelect')?.value || 'daily'; // 'daily' or 'monthly'
+            const estMode = document.getElementById('yieldEstModeSelect')?.value || 'full12'; // 'full12' or 'actual_only'
+            const cityFilter = document.getElementById('yieldCityFilter')?.value || '';
+
+            const districts = data.districts.filter(d => !cityFilter || d.city === cityFilter);
+            const plants = data.plants.filter(p => !cityFilter || p.city === cityFilter);
+
+            const formatMonthCell = (mObj) => {
+                if (estMode === 'actual_only' && !mObj.isActual) {
+                    return `<td class="py-2 px-2 text-right text-slate-300">-</td>`;
+                }
+                const val = unit === 'daily'
+                    ? (estMode === 'actual_only' ? mObj.actualDmy : mObj.dmy)
+                    : (estMode === 'actual_only' ? mObj.actualMmy : mObj.mmy);
+                if (val === null || val === undefined) {
+                    return `<td class="py-2 px-2 text-right text-slate-300">-</td>`;
+                }
+                const formatted = unit === 'daily' ? val.toFixed(2) : val.toFixed(1);
+                if (mObj.isActual) {
+                    return `<td class="py-2 px-2 text-right font-bold text-emerald-900 bg-emerald-50/80 border-b border-emerald-100" title="電費單實測反推 (${mObj.month}月)：${mObj.dmy.toFixed(2)} kWh/kWp/日 ｜ ${mObj.mmy.toFixed(1)} kWh/kWp/月">${formatted}</td>`;
+                } else {
+                    return `<td class="py-2 px-2 text-right text-brand-700 bg-slate-50/40" title="依該區鄉鎮實測基準＋季節曲線反推 (${mObj.month}月)：${mObj.dmy.toFixed(2)} kWh/kWp/日 ｜ ${mObj.mmy.toFixed(1)} kWh/kWp/月"><span class="border-b border-dashed border-brand-400 pb-0.5">${formatted}</span></td>`;
+                }
+            };
+
+            // 1. Render District Table Body
+            const distBody = document.getElementById('districtYieldTableBody');
+            if (distBody) {
+                distBody.innerHTML = districts.map(d => {
+                    const dmyYear = estMode === 'actual_only' ? d.annualDmyActual : d.annualDmyFull;
+                    const mmyYear = estMode === 'actual_only' ? d.annualMmyActual : d.annualMmyFull;
+                    const totYear = estMode === 'actual_only' ? d.annualTotalActual : d.annualTotalFull;
+
+                    return `
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="py-2.5 px-3 sticky left-0 bg-white font-sans font-bold text-slate-900 whitespace-nowrap border-r border-slate-100">
+                                <span class="inline-flex items-center space-x-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                    <span>${d.city} · <strong class="text-brand-800">${d.district}</strong></span>
+                                </span>
+                            </td>
+                            <td class="py-2.5 px-2.5 text-center font-sans font-semibold text-slate-700">${d.plantCount} 座</td>
+                            <td class="py-2.5 px-2.5 text-right font-bold text-slate-800">${d.totalCapacityKwp.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            ${d.months.map(formatMonthCell).join('')}
+                            <td class="py-2.5 px-3 text-right font-black text-amber-900 bg-amber-50/90 border-l border-amber-200">${dmyYear !== null ? dmyYear.toFixed(2) : '-'}</td>
+                            <td class="py-2.5 px-3 text-right font-black text-brand-900 bg-brand-50/80">${mmyYear !== null ? mmyYear.toFixed(1) : '-'}</td>
+                            <td class="py-2.5 px-3 text-right font-black text-emerald-900 bg-emerald-50/90">${totYear !== null ? Math.round(totYear).toLocaleString() : '-'}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // Render District Table Footer (Capacity-Weighted Average across filtered districts)
+            const distFoot = document.getElementById('districtYieldTableFoot');
+            if (distFoot && districts.length > 0) {
+                const totalCap = districts.reduce((s, d) => s + d.totalCapacityKwp, 0) || 1;
+                const totalPlants = districts.reduce((s, d) => s + d.plantCount, 0);
+                const footMonths = [];
+                let footAnnualTotal = 0;
+
+                for (let m = 0; m < 12; m++) {
+                    const wDmy = districts.reduce((s, d) => s + d.months[m].dmy * d.totalCapacityKwp, 0) / totalCap;
+                    const wMmy = wDmy * STANDARD_MONTH_DAYS[m];
+                    footAnnualTotal += wMmy;
+                    footMonths.push(unit === 'daily' ? wDmy.toFixed(2) : wMmy.toFixed(1));
+                }
+
+                const footDmy = footAnnualTotal / 365;
+                const footMmy = footAnnualTotal / 12;
+
+                distFoot.innerHTML = `
+                    <tr>
+                        <td class="py-2.5 px-3 sticky left-0 bg-slate-100 font-sans font-black text-slate-900">全區加權平均 / 總計</td>
+                        <td class="py-2.5 px-2.5 text-center font-sans font-bold">${totalPlants} 座</td>
+                        <td class="py-2.5 px-2.5 text-right font-black">${totalCap.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        ${footMonths.map(v => `<td class="py-2.5 px-2 text-right font-bold text-slate-800">${v}</td>`).join('')}
+                        <td class="py-2.5 px-3 text-right font-black text-amber-900 bg-amber-100/80">${footDmy.toFixed(2)}</td>
+                        <td class="py-2.5 px-3 text-right font-black text-brand-900 bg-brand-100/80">${footMmy.toFixed(1)}</td>
+                        <td class="py-2.5 px-3 text-right font-black text-emerald-900 bg-emerald-100/80">${Math.round(footAnnualTotal).toLocaleString()}</td>
+                    </tr>
+                `;
+            }
+
+            // 2. Render Individual Plant Table Body
+            const plantBody = document.getElementById('plantYieldTableBody');
+            if (plantBody) {
+                plantBody.innerHTML = plants.map(p => {
+                    const dmyYear = estMode === 'actual_only' ? p.annualDmyActual : p.annualDmyFull;
+                    const mmyYear = estMode === 'actual_only' ? p.annualMmyActual : p.annualMmyFull;
+                    const totYear = estMode === 'actual_only' ? p.annualTotalActual : p.annualTotalFull;
+
+                    return `
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="py-2.5 px-3 sticky left-0 bg-white font-sans whitespace-nowrap border-r border-slate-100">
+                                <div class="flex items-center justify-between space-x-2">
+                                    <div>
+                                        <div class="font-bold text-slate-900 text-xs">${p.site_name}</div>
+                                        <div class="font-mono text-[10px] text-slate-400">${p.electric_number}</div>
+                                    </div>
+                                    <button type="button" onclick="focusPlantOnMapView('${p.electric_number}')" class="px-2 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition cursor-pointer" title="在上方 Google Maps 定位此案場">
+                                        📍 定位
+                                    </button>
+                                </div>
+                            </td>
+                            <td class="py-2.5 px-2.5 font-sans whitespace-nowrap">
+                                <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-100 text-slate-700 border border-slate-200">${p.fullDistrict}</span>
+                            </td>
+                            <td class="py-2.5 px-2.5 text-right font-semibold text-slate-700">${p.capacity_kwp.toFixed(2)}</td>
+                            <td class="py-2.5 px-2 text-center font-sans">
+                                <span class="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-800">${p.billCount} 期</span>
+                            </td>
+                            ${p.months.map(formatMonthCell).join('')}
+                            <td class="py-2.5 px-3 text-right font-black text-amber-900 bg-amber-50/70 border-l border-amber-200">${dmyYear !== null ? dmyYear.toFixed(2) : '-'}</td>
+                            <td class="py-2.5 px-3 text-right font-black text-brand-900 bg-brand-50/70">${mmyYear !== null ? mmyYear.toFixed(1) : '-'}</td>
+                            <td class="py-2.5 px-3 text-right font-black text-emerald-900 bg-emerald-50/70">${totYear !== null ? Math.round(totYear).toLocaleString() : '-'}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        // 站內快速 Google Maps 彈窗 (從電費單列表或預覽視窗一鍵呼叫)
+        function openQuickMapModal(billIndex) {
+            const b = currentBills[billIndex];
+            if (!b) return;
+            const mapInfo = getPlantMapInfo(b);
+            const billYield = getSingleBillYieldInfo(b);
+
+            quickMapCurrentQuery = mapInfo.query;
+            quickMapCurrentType = 'h';
+
+            document.getElementById('quickMapDistrictBadge').innerText = mapInfo.fullDistrict;
+            document.getElementById('quickMapTitle').innerText = `${mapInfo.site_name} (${b.electric_number || '-'})`;
+            document.getElementById('quickMapAddress').innerText = `📍 設置地點：${mapInfo.plant_location}`;
+            document.getElementById('quickMapExternalLink').href = mapInfo.externalUrl;
+            document.getElementById('quickMapIframe').src = `https://maps.google.com/maps?q=${encodeURIComponent(quickMapCurrentQuery)}&t=h&z=17&hl=zh-TW&output=embed`;
+
+            const yieldInfoEl = document.getElementById('quickMapYieldInfo');
+            if (yieldInfoEl) {
+                if (billYield) {
+                    yieldInfoEl.innerHTML = `⚡ 本單裝置容量：<strong>${billYield.cap.toFixed(2)} kWp</strong> ｜ 本期購電度數：<strong>${Math.round(billYield.kwh).toLocaleString()} kWh</strong> (${billYield.days}天) ｜ 反推日均峰瓦值：<strong class="text-amber-700">${billYield.dmy.toFixed(2)} kWh/kWp/日</strong>`;
+                } else {
+                    yieldInfoEl.innerText = `電號：${b.electric_number || '-'} ｜ 行政區：${mapInfo.fullDistrict}`;
+                }
+            }
+
+            const jumpBtn = document.getElementById('quickMapJumpFullBtn');
+            if (jumpBtn) {
+                jumpBtn.onclick = () => focusPlantOnMapView(b.electric_number);
+            }
+
+            switchQuickMapType('h');
+            document.getElementById('quickMapModal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function switchQuickMapType(type) {
+            quickMapCurrentType = type;
+            const btnSat = document.getElementById('quickMapBtnSat');
+            const btnRoad = document.getElementById('quickMapBtnRoad');
+            if (btnSat && btnRoad) {
+                if (type === 'h') {
+                    btnSat.className = "px-2.5 py-1.5 text-xs font-bold rounded-lg bg-slate-800 text-white";
+                    btnRoad.className = "px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-white text-slate-700 border border-slate-300";
+                } else {
+                    btnRoad.className = "px-2.5 py-1.5 text-xs font-bold rounded-lg bg-slate-800 text-white";
+                    btnSat.className = "px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-white text-slate-700 border border-slate-300";
+                }
+            }
+            const iframe = document.getElementById('quickMapIframe');
+            if (iframe && quickMapCurrentQuery) {
+                iframe.src = `https://maps.google.com/maps?q=${encodeURIComponent(quickMapCurrentQuery)}&t=${type}&z=17&hl=zh-TW&output=embed`;
+            }
+        }
+
+        function closeQuickMapModal() {
+            document.getElementById('quickMapModal').classList.add('hidden');
+            const iframe = document.getElementById('quickMapIframe');
+            if (iframe) iframe.src = '';
+        }
+
+        // 匯出台灣「區、鄉鎮」與「各案場」1~12 個月及全年平均峰瓦值 Excel 報表
+        function exportYieldAnalysisExcel() {
+            const data = cachedYieldAnalytics || buildDistrictAndPlantYieldAnalytics();
+            if (!data || !window.XLSX) {
+                showToast('Excel 模組尚未就緒', true);
+                return;
+            }
+
+            const wb = XLSX.utils.book_new();
+
+            // Sheet 1: 台灣「縣市+區鄉鎮」1~12月日均峰瓦值 (kWh/kWp/日) 與月累積峰瓦值 (kWh/kWp/月)
+            const distRows = [
+                ['進金生能源服務股份有限公司 ｜ 台灣「縣市 · 區/鄉/鎮」Level 太陽能電費單反推 1~12 個月及全年平均峰瓦值 (kWh/kWp) 報表'],
+                ['說明：綠底實測月份由電費單實際度數反推；未上傳月份依該區鄉鎮實測錨點結合台灣分區日照季節曲線反推。'],
+                [],
+                ['【一、各區鄉鎮 1~12 個月日均峰瓦值 (kWh/kWp/日，等效滿發日照時數 DMY)】'],
+                ['縣市', '區/鄉/鎮', '案場數', '總裝置容量 (kWp)', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月', '全年平均日峰瓦 (kWh/kWp/日)', '全年平均月峰瓦 (kWh/kWp/月)', '反推全年總發電 (kWh/kWp/年)']
+            ];
+
+            data.districts.forEach(d => {
+                distRows.push([
+                    d.city,
+                    d.district,
+                    d.plantCount,
+                    Number(d.totalCapacityKwp.toFixed(2)),
+                    ...d.months.map(m => Number(m.dmy.toFixed(2))),
+                    Number(d.annualDmyFull.toFixed(2)),
+                    Number(d.annualMmyFull.toFixed(1)),
+                    Math.round(d.annualTotalFull)
+                ]);
+            });
+
+            distRows.push([]);
+            distRows.push(['【二、各區鄉鎮 1~12 個月累積峰瓦值 (kWh/kWp/月)】']);
+            distRows.push(['縣市', '區/鄉/鎮', '案場數', '總裝置容量 (kWp)', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月', '全年平均日峰瓦 (kWh/kWp/日)', '全年平均月峰瓦 (kWh/kWp/月)', '反推全年總發電 (kWh/kWp/年)']);
+
+            data.districts.forEach(d => {
+                distRows.push([
+                    d.city,
+                    d.district,
+                    d.plantCount,
+                    Number(d.totalCapacityKwp.toFixed(2)),
+                    ...d.months.map(m => Number(m.mmy.toFixed(1))),
+                    Number(d.annualDmyFull.toFixed(2)),
+                    Number(d.annualMmyFull.toFixed(1)),
+                    Math.round(d.annualTotalFull)
+                ]);
+            });
+
+            const wsDist = XLSX.utils.aoa_to_sheet(distRows);
+            XLSX.utils.book_append_sheet(wb, wsDist, '1_台灣區鄉鎮峰瓦值基準表');
+
+            // Sheet 2: 各太陽能案場 1~12 月及全年平均峰瓦值明細表
+            const plantRows = [
+                ['進金生能源服務股份有限公司 ｜ 各太陽能案場由電費單反推 1~12 個月及全年平均峰瓦值 (kWh/kWp) 明細表'],
+                [],
+                ['【一、各案場 1~12 個月日均峰瓦值 (kWh/kWp/日)】'],
+                ['案場名稱', '台電電號', '縣市', '區/鄉/鎮', '設置地址', 'Google Maps 導航連結', '裝置容量 (kWp)', '實測帳單數', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月', '全年日均 (kWh/kWp/日)', '全年月均 (kWh/kWp/月)', '全年累計 (kWh/kWp/年)']
+            ];
+
+            data.plants.forEach(p => {
+                plantRows.push([
+                    p.site_name,
+                    p.electric_number,
+                    p.city,
+                    p.district,
+                    p.plant_location,
+                    p.mapInfo.externalUrl,
+                    Number(p.capacity_kwp.toFixed(2)),
+                    p.billCount,
+                    ...p.months.map(m => Number(m.dmy.toFixed(2))),
+                    Number(p.annualDmyFull.toFixed(2)),
+                    Number(p.annualMmyFull.toFixed(1)),
+                    Math.round(p.annualTotalFull)
+                ]);
+            });
+
+            plantRows.push([]);
+            plantRows.push(['【二、各案場 1~12 個月累積峰瓦值 (kWh/kWp/月)】']);
+            plantRows.push(['案場名稱', '台電電號', '縣市', '區/鄉/鎮', '設置地址', 'Google Maps 導航連結', '裝置容量 (kWp)', '實測帳單數', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月', '全年日均 (kWh/kWp/日)', '全年月均 (kWh/kWp/月)', '全年累計 (kWh/kWp/年)']);
+
+            data.plants.forEach(p => {
+                plantRows.push([
+                    p.site_name,
+                    p.electric_number,
+                    p.city,
+                    p.district,
+                    p.plant_location,
+                    p.mapInfo.externalUrl,
+                    Number(p.capacity_kwp.toFixed(2)),
+                    p.billCount,
+                    ...p.months.map(m => Number(m.mmy.toFixed(1))),
+                    Number(p.annualDmyFull.toFixed(2)),
+                    Number(p.annualMmyFull.toFixed(1)),
+                    Math.round(p.annualTotalFull)
+                ]);
+            });
+
+            const wsPlant = XLSX.utils.aoa_to_sheet(plantRows);
+            XLSX.utils.book_append_sheet(wb, wsPlant, '2_各案場1至12月峰瓦值明細');
+
+            XLSX.writeFile(wb, `進金生能源_台灣區鄉鎮與案場1至12月峰瓦值分析_${new Date().toISOString().slice(0,10)}.xlsx`);
+            showToast('🎉 已匯出「台灣區鄉鎮 ＆ 各案場 1~12 月峰瓦值 (kWh/kWp)」Excel 報表！');
+        }
+
     </script>
 </body>
 </html>
