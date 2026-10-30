@@ -244,13 +244,17 @@ async def api_import_dispatch(request: Request):
 from starlette.routing import Route, Mount
 from starlette.staticfiles import StaticFiles
 
+async def trend_styles(request):
+    return FileResponse(ROOT_HTML.parent / 'trends.css', media_type='text/css')
+
 async def client_script(request):
     name = request.path_params['name'] + '.js'
-    if name not in {'supabase-client.js','auth.js','bill-recognition.js'}:
+    if name not in {'supabase-client.js','auth.js','bill-recognition.js','trends-core.js','plant-trends.js'}:
         return Response(status_code=404)
     return FileResponse(ROOT_HTML.parent / name, media_type='application/javascript')
 
 routes = [
+    Route("/trends.css", endpoint=trend_styles, methods=["GET"]),
     Route('/{name}.js', endpoint=client_script, methods=['GET']),
     Route("/", endpoint=index_view, methods=["GET"]),
     Route("/api/bills", endpoint=api_list_bills, methods=["GET"]),

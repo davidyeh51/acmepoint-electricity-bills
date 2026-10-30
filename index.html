@@ -47,7 +47,10 @@
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <!-- Supabase Client Module -->
     <script src="supabase-client.js?v=20261030.1"></script>
-    <script src="auth.js?v=20261030.1"></script>
+    <script src="auth.js?v=20261030.2"></script>
+    <script src="trends-core.js?v=20261030.2"></script>
+    <script src="plant-trends.js?v=20261030.2"></script>
+    <link rel="stylesheet" href="trends.css?v=20261030.2">
     <script src="bill-recognition.js?v=20261030.1"></script>
     <style>
         [hidden] { display: none !important; }
@@ -174,6 +177,7 @@
                     <span>案場地圖 ＆ 區鄉鎮峰瓦值 (kWh/kWp)</span>
                     <span class="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 rounded-full">Google Maps + 反推</span>
                 </button>
+                <button id="navTabTrends" onclick="switchMainView('trends')" class="inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-white text-slate-700 hover:bg-slate-50 border border-slate-200"><i data-lucide="chart-no-axes-combined" class="w-4 h-4 text-brand-600"></i><span>案場發電與收益趨勢</span></button>
             </div>
             <div id="calculatorTopActions" class="hidden flex items-center space-x-2">
                 <button onclick="copyOmSummaryText()" class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition shadow-sm" title="複製 LINE/Email 請款通知摘要">
@@ -880,6 +884,47 @@
             </div>
         </div><!-- End mapYieldView -->
 
+    <section id="trendsView" class="hidden space-y-5" aria-labelledby="trendTitle">
+ <div class="trend-hero">
+  <div><p class="trend-eyebrow">PROJECT PERFORMANCE · 歷史實績</p><h2 id="trendTitle">案場發電與收益趨勢</h2><p>從第一份帳單開始，檢視售電量、電費收入與每 kW 發電表現。</p></div>
+  <div class="trend-toolbar"><button type="button" onclick="PlantTrends.load(true)" id="trendRefresh">重新整理</button><button type="button" onclick="PlantTrends.exportExcel()" id="trendExport" disabled>匯出分析 Excel</button></div>
+ </div>
+ <div class="trend-controls">
+  <label>選擇案場<select id="trendPlant" onchange="PlantTrends.selectPlant()"><option value="">讀取案場中…</option></select></label>
+  <label>趨勢區間<select id="trendGrain" onchange="PlantTrends.render()"><option value="period">每張帳單的實際計費期間</option><option value="year">曆年統計（跨年帳單按日分攤）</option></select></label>
+  <label>收入口徑<select id="trendRevenue" onchange="PlantTrends.render()"><option value="purchase_amount">未稅售電收入</option><option value="net_payable_amount">含稅應付淨額（非實際入帳）</option></select></label>
+ </div>
+ <p id="trendStatus" role="status" aria-live="polite" class="trend-status">切換至本頁後載入完整帳單。</p>
+ <div id="trendPeriod" class="trend-period"></div>
+ <div id="trendMetrics" class="trend-metrics"></div>
+ <div id="trendQuality" class="trend-quality"></div>
+ <div class="trend-charts">
+  <figure class="trend-panel"><figcaption><h3>發電表現</h3><p>帳單購電度數（售電量）；不等於逆變器總發電量。</p></figcaption><div id="trendEnergyChart" class="trend-chart"></div></figure>
+  <figure class="trend-panel"><figcaption><h3 id="trendRevenueTitle">未稅售電收入</h3><p>收入與用電／輸電支出分開，未填金額不當作零。</p></figcaption><div id="trendRevenueChart" class="trend-chart"></div></figure>
+  <figure class="trend-panel trend-wide"><figcaption><h3>每日每 kW 售電量趨勢 <span class="trend-small">每日峰瓦值</span></h3><p>已按各期裝置容量與實際天數正規化；虛線為完整年度基準。</p></figcaption><div id="trendYieldChart" class="trend-chart"></div></figure>
+ </div>
+ <section class="trend-panel">
+  <div class="trend-section-title"><div><h3>保證發電量的參考試算</h3><p>使用已完整覆蓋的曆年實績；未完整年度不參與基準。</p></div><span id="trendFullYears" class="trend-chip"></span></div>
+  <div class="trend-controls">
+   <label>歷史基準<select id="trendScenarioSource" onchange="PlantTrends.scenario()"><option value="average">完整年度加權平均</option><option value="minimum">完整年度最低觀測值</option></select></label>
+   <label>評估裝置容量（kW）<input id="trendScenarioCapacity" type="number" min="0.001" step="any" oninput="PlantTrends.scenario()"></label>
+   <label>保留比例（%）<input id="trendScenarioFactor" type="number" min="0" max="100" step="0.1" value="100" oninput="PlantTrends.scenario()"></label>
+  </div>
+  <div id="trendScenarioResult" class="trend-scenario" role="status" aria-live="polite"></div>
+  <p class="trend-note">此為歷史條件下的比較試算，不是 P90、未來預測或已驗證的保證值。簽訂承諾前，仍須評估天候、設備衰退、限電與可用率；帳單售電量也不含自用或未結算發電。</p>
+ </section>
+ <section class="trend-panel">
+  <div class="trend-section-title"><div><h3>逐年表現與資料完整度</h3><p>度數與收入依計費期間按日分攤至曆年；不能解讀為逐日實測。</p></div></div>
+  <div class="trend-scroll"><table class="trend-table"><thead><tr><th>年度</th><th>有效天數 / 全年</th><th>售電量 kWh</th><th id="trendYearRevenueHeader">收入 NT$</th><th>每日峰瓦值</th><th>每 kW 年售電量¹</th><th>納入基準</th></tr></thead><tbody id="trendYearRows"></tbody></table></div>
+  <p class="trend-note">¹ 僅完整曆年顯示 365 日標準化值；每日峰瓦值單位為 kWh/kW/日。</p>
+ </section>
+ <details class="trend-panel"><summary>查看計費期與機組明細</summary><div class="trend-scroll"><table class="trend-table"><thead><tr><th>計費期間</th><th>天數</th><th>容量 kW</th><th>購電度數 kWh</th><th>收入 NT$</th><th>每日峰瓦值</th><th>機組明細（不重複加總）</th><th>原始帳單</th></tr></thead><tbody id="trendBillRows"></tbody></table></div></details>
+ <details class="trend-panel"><summary id="trendAuditSummary">資料檢核與統計口徑</summary>
+  <div id="trendIssues" class="trend-audit"></div>
+  <ul class="trend-method"><li>歷史平均每日峰瓦值＝Σ購電度數 ÷ Σ（各期帳單裝置容量 × 計費天數）。期間含起訖日，零發電保留；不使用最新容量回推全部歷史。</li><li>完整年度基準＝完整年度總度數 ÷ 完整年度總容量日 × 365。每年須覆蓋全部 365／366 天，缺月或首尾未滿年度不納入。</li><li>「開始」是最早可追溯帳單，不代表已確認的商轉日。最後計費日之後的時間不外推發電，也不視為零。</li><li>用電／輸電支出、待核對帳單、無效日期或容量、重複資料皆分開檢核。不同帳單期間重疊時，先排除有疑義的帳單，避免重複計入售電量。缺漏表示資料庫沒有可納入的帳單；即使來源資料夾有檔案，仍須核對電號與計費期間，不能僅以檔名判斷案場。</li><li>峰瓦值在本頁指每 kW 的平均每日售電量。分母採帳單裝置容量，若與模組 DC 銘牌容量不同，需核對後再跨案場比較；本頁不計算需要輻照資料的 PR。</li></ul>
+  <p class="trend-note">參考定義：<a href="https://www.pvsyst.com/help/project-design/results/normalised-performance-index.html" target="_blank" rel="noopener noreferrer">PVsyst 比發電量與單位</a>；<a href="https://pvpmc.sandia.gov/modeling-guide/5-ac-system-output/uncertainty-quantification/" target="_blank" rel="noopener noreferrer">Sandia 發電量不確定性</a>。帳單資料來自登入後可存取的電費單資料庫。</p>
+ </details>
+</section>
     </main>
 
     <!-- Quick Google Map Modal (Triggered from Bills Table or Preview Modal) -->
@@ -1600,6 +1645,7 @@
 
         // Load Data (KPIs + Filters + Table)
         async function loadAllData() {
+            if (typeof PlantTrends !== 'undefined') PlantTrends.invalidate();
             await fetchKPIs();
             await fetchFilterOptions();
             await renderBillsTable();
@@ -2418,6 +2464,8 @@
         }
 
         function switchMainView(view) {
+            const tabTrend = document.getElementById('navTabTrends');
+            const trendView = document.getElementById('trendsView');
             const tabBills = document.getElementById('navTabBills');
             const tabCalc = document.getElementById('navTabCalculator');
             const tabMapYield = document.getElementById('navTabMapYield');
@@ -2430,17 +2478,23 @@
             const inactiveCls = "inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-white text-slate-700 hover:bg-slate-50 border border-slate-200";
             const activeCls = "inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-brand-600 text-white";
 
+            trendView.classList.add('hidden');
             billsView.classList.add('hidden');
             calcView.classList.add('hidden');
             if (mapYieldView) mapYieldView.classList.add('hidden');
             topActions.classList.add('hidden');
             if (mapTopActions) mapTopActions.classList.add('hidden');
 
+            tabTrend.className = inactiveCls;
             tabBills.className = inactiveCls;
             tabCalc.className = inactiveCls;
             if (tabMapYield) tabMapYield.className = inactiveCls;
 
-            if (view === 'calculator') {
+            if (view === 'trends') {
+                trendView.classList.remove('hidden');
+                tabTrend.className = activeCls;
+                PlantTrends.load();
+            } else if (view === 'calculator') {
                 calcView.classList.remove('hidden');
                 tabCalc.className = activeCls;
                 topActions.classList.remove('hidden');

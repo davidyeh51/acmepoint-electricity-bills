@@ -30,6 +30,11 @@ def main():
             duplicates.append({'source':str(source),'same_as':seen[digest],'reason':'identical_file'});continue
         seen[digest]=str(source);candidates.append(data)
     if missing:raise SystemExit('OCR cache incomplete: '+str(len(missing))+' files remaining')
+    case_electrics=defaultdict(Counter)
+    for data in candidates:
+        if data.get("electric_number") and data["bill_type"]=="FIT":case_electrics[data["_case"]][data["electric_number"]]+=1
+    expected={case:counts.most_common(1)[0][0] for case,counts in case_electrics.items()}
+    source_mismatches=[{"source":data["_source"],"folder_case":data["_case"],"printed_electric_number":data["electric_number"],"expected_electric_number":expected[data["_case"]]} for data in candidates if data["bill_type"]=="FIT" and data.get("electric_number") and data["_case"] in expected and data["electric_number"]!=expected[data["_case"]]]
     unique=[];periods={}
     for data in candidates:
         key=tuple(data.get(k) for k in ['electric_number','billing_start_ad','billing_end_ad','bill_type','total_kwh','net_payable_amount'])
@@ -57,7 +62,7 @@ def main():
         if source.exists() and not data.get('file_url'):
             row=dict(data);row.update(file_hash=calculate_sha256(source),file_size=source.stat().st_size,_source=str(source),_case='既有原檔移轉')
             originals.append(row)
-    summary={'source_pdf_count':len(manifest),'unique_bill_count':len(unique),'source_fit_count':sum(x['bill_type']=='FIT' for x in unique),'source_expense_count':sum(x['bill_type']=='CONSUMPTION' for x in unique),'by_case':dict(Counter(x['_case'] for x in unique)),'duplicates':duplicates,'excluded':excluded,'conflicts':conflicts,'repairs':len(repairs),'original_pdf_migrations':len(originals),'review':[{'filename':x['filename'],'warnings':x['parse_warnings']} for x in unique if x['status']=='NEEDS_REVIEW']}
+    summary={'source_pdf_count':len(manifest),'unique_bill_count':len(unique),'source_fit_count':sum(x['bill_type']=='FIT' for x in unique),'source_expense_count':sum(x['bill_type']=='CONSUMPTION' for x in unique),'by_case':dict(Counter(x['_case'] for x in unique)),'duplicates':duplicates,'source_mismatches':source_mismatches,'excluded':excluded,'conflicts':conflicts,'repairs':len(repairs),'original_pdf_migrations':len(originals),'review':[{'filename':x['filename'],'warnings':x['parse_warnings']} for x in unique if x['status']=='NEEDS_REVIEW']}
     (OUT/'audited_import.json').write_text(json.dumps({'bills':unique+repairs+originals,'errors':conflicts,'summary':summary},ensure_ascii=False,indent=2),'utf-8')
     (OUT/'import_audit.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2),'utf-8')
     print(json.dumps(summary,ensure_ascii=False),flush=True)

@@ -29,6 +29,7 @@ const BillAuth = {
     return true;
   },
   lock() {
+    if (typeof PlantTrends !== 'undefined') PlantTrends.reset();
     this.profile = null; this.user = null;
     document.documentElement.classList.remove('authenticated');
     const gate = document.getElementById('authGate'); if (gate) gate.hidden = false;
