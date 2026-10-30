@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>進金生能源 - 客戶太陽能電費單管理系統</title>
+    <link rel="icon" href="data:,">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -39,14 +40,18 @@
         }
     </script>
     <!-- Supabase JS SDK (Official CDN) -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4"></script>
     <!-- SheetJS for Client-side Excel Export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Tesseract.js for Browser OCR of Scanned Bills -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <!-- Supabase Client Module -->
-    <script src="supabase-client.js"></script>
+    <script src="supabase-client.js?v=20261030.1"></script>
+    <script src="auth.js?v=20261030.1"></script>
+    <script src="bill-recognition.js?v=20261030.1"></script>
     <style>
+        [hidden] { display: none !important; }
+        html:not(.authenticated) body > :not(#authGate):not(script):not(style) { display: none !important; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
         @media print {
             body {
@@ -72,10 +77,23 @@
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased">
+<section id="authGate" class="min-h-screen flex items-center justify-center bg-slate-100 px-4">
+  <div class="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-8 shadow-lg">
+    <p class="text-sm font-semibold text-blue-700 mb-2">進金生能源 6692</p>
+    <h1 class="text-2xl font-bold text-slate-900 mb-2">電費單管理系統</h1>
+    <p class="text-sm text-slate-500 mb-6">請使用管理者提供的帳號登入。</p>
+    <form onsubmit="BillAuth.login(event)" class="space-y-4">
+      <div><label for="loginUsername" class="block text-sm mb-1">帳號</label><input id="loginUsername" name="username" autocomplete="username" required class="w-full border rounded-lg px-3 py-2" autofocus></div>
+      <div><label for="loginPassword" class="block text-sm mb-1">密碼</label><input id="loginPassword" name="password" type="password" autocomplete="current-password" required class="w-full border rounded-lg px-3 py-2"></div>
+      <p id="loginMessage" role="alert" aria-live="polite" class="text-sm text-red-700 min-h-5"></p>
+      <button id="loginSubmit" type="submit" class="w-full bg-blue-700 text-white font-semibold py-2.5 rounded-lg disabled:opacity-50">登入</button>
+    </form>
+  </div>
+</section>
 
     <!-- Top Navigation Bar -->
     <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-3 flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-700 to-solar-500 flex items-center justify-center text-white shadow-md">
                     <i data-lucide="zap" class="w-6 h-6"></i>
@@ -89,10 +107,16 @@
                 </div>
             </div>
 
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+ <span id="accountLabel" class="font-semibold text-slate-600"></span>
+ <button type="button" data-admin-only onclick="BillAuth.openAccounts()" class="px-3 py-2 border rounded-lg">帳號管理</button>
+ <button type="button" onclick="document.getElementById('passwordModal').classList.remove('hidden')" class="px-3 py-2 border rounded-lg">修改密碼</button>
+ <button type="button" onclick="BillAuth.logout()" class="px-3 py-2 border rounded-lg">登出</button>
+</div>
             <!-- Action Buttons & Supabase Status -->
-            <div class="flex items-center space-x-2.5">
+            <div class="flex flex-wrap items-center gap-2">
                 <!-- Supabase Cloud Connection Indicator -->
-                <button onclick="openSupabaseSettingsModal()" id="supabaseStatusBadge" class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-full border transition cursor-pointer">
+                <button onclick="openSupabaseSettingsModal()" data-admin-only id="supabaseStatusBadge" class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-full border transition cursor-pointer">
                     <span class="w-2 h-2 rounded-full" id="statusDot"></span>
                     <span id="statusText">連線中...</span>
                 </button>
@@ -188,11 +212,11 @@
 
             <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
                 <div class="flex items-center justify-between text-slate-500 mb-1">
-                    <span class="text-xs font-semibold uppercase tracking-wider">電費單總數</span>
+                    <span class="text-xs font-semibold uppercase tracking-wider">售電帳單數</span>
                     <i data-lucide="file-text" class="w-4 h-4 text-brand-500"></i>
                 </div>
                 <div class="text-2xl font-bold text-slate-900" id="kpiBillCount">-</div>
-                <div class="text-xs text-slate-400 mt-1">已建檔辨識帳單</div>
+                <div class="text-xs text-slate-400 mt-1">不含用電／輸電支出</div>
             </div>
 
             <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow transition">
@@ -1395,6 +1419,28 @@
         </div>
     </div>
 
+    <div id="passwordModal" class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4 hidden">
+ <div class="bg-white rounded-2xl p-6 w-full max-w-md"><h2 class="text-lg font-bold mb-4">修改密碼</h2>
+ <form onsubmit="BillAuth.changePassword(event)" class="space-y-3">
+ <label class="block text-sm">目前密碼<input id="currentPassword" type="password" autocomplete="current-password" required class="block border rounded-lg px-3 py-2 w-full"></label>
+ <label class="block text-sm">新密碼<input id="newPassword" type="password" minlength="8" autocomplete="new-password" required class="block border rounded-lg px-3 py-2 w-full"></label>
+ <label class="block text-sm">確認新密碼<input id="confirmPassword" type="password" minlength="8" autocomplete="new-password" required class="block border rounded-lg px-3 py-2 w-full"></label>
+ <p id="passwordMessage" role="status" class="text-sm text-blue-700"></p>
+ <div class="flex justify-end gap-2"><button type="button" onclick="document.getElementById('passwordModal').classList.add('hidden')" class="border rounded-lg px-4 py-2">關閉</button><button type="submit" class="bg-blue-700 text-white rounded-lg px-4 py-2">更新密碼</button></div>
+ </form></div>
+</div>
+<div id="accountsModal" class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4 hidden">
+ <div class="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"><div class="flex justify-between items-center mb-4"><h2 class="text-lg font-bold">帳號管理</h2><button type="button" onclick="document.getElementById('accountsModal').classList.add('hidden')" class="border rounded-lg px-3 py-1">關閉</button></div>
+ <p class="text-xs text-slate-500 mb-3">管理者可管理帳號；使用者可查詢、上傳、修正及匯出電費單。</p>
+ <div id="accountsList" class="text-sm mb-6"></div><h3 class="font-bold mb-3">新增帳號</h3>
+ <form onsubmit="BillAuth.createAccount(event)" class="grid sm:grid-cols-2 gap-3">
+ <label class="text-sm">帳號<input id="newUsername" autocomplete="off" pattern="[a-z][a-z0-9_]{2,31}" required class="block w-full border rounded-lg px-3 py-2"></label>
+ <label class="text-sm">權限<select id="newRole" class="block w-full border rounded-lg px-3 py-2"><option value="user">使用者</option><option value="admin">管理者</option></select></label>
+ <label class="text-sm">初始密碼<input id="accountPassword" type="password" autocomplete="new-password" minlength="8" required class="block w-full border rounded-lg px-3 py-2"></label>
+ <div class="flex items-end"><button type="submit" class="bg-blue-700 text-white rounded-lg px-4 py-2">建立帳號</button></div>
+ <p id="accountMessage" role="status" class="text-sm text-blue-700 sm:col-span-2"></p>
+ </form></div>
+</div>
     <!-- Toast Notification -->
     <div id="toast" class="fixed bottom-5 right-5 z-50 flex items-center space-x-2 px-4 py-3 rounded-xl shadow-xl bg-slate-900 text-white text-sm transform transition-all translate-y-16 opacity-0 pointer-events-none">
         <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400" id="toastIcon"></i>
@@ -1421,19 +1467,13 @@
             if (rateInp) rateInp.addEventListener('input', autoCalculatePreviewAmounts);
             if (rentInp) rentInp.addEventListener('input', autoCalculatePreviewAmounts);
 
-            if (SupabaseBillService.isConfigured()) {
-                // 背景靜默同步本地離線電費單（如五甲尾）至雲端
-                SupabaseBillService.syncLocalBillsToCloud().then(res => {
-                    if (res && res.syncedCount > 0) {
-                        showToast(`🎉 已自動將本機 ${res.syncedCount} 筆離線電費單（含五甲尾等）同步至 Supabase 雲端！`);
-                        loadAllData();
-                    }
-                }).catch(e => console.warn('Background sync note:', e));
-            }
-            loadAllData();
+            if (await BillAuth.init()) await loadAllData();
         });
 
         // Toast feedback
+        function escapeBillHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
         function showToast(msg, isError = false) {
             const toast = document.getElementById('toast');
             const toastMsg = document.getElementById('toastMsg');
@@ -1696,8 +1736,14 @@
                 }
 
                 tbody.innerHTML = bills.map((b, idx) => {
-                    const payableStr = b.net_payable_amount ? Math.round(b.net_payable_amount).toLocaleString() : '-';
-                    const kwhStr = b.total_kwh ? Math.round(b.total_kwh).toLocaleString() : '-';
+                    b = {...b};
+                    for (const key of ['site_name','customer_name','customer_address','plant_location','city','district','electric_number','contract_number','tax_id','bill_year_month','billing_period']) {
+                        if (typeof b[key] === 'string') b[key] = escapeBillHtml(b[key]);
+                    }
+                    const payableValue = b.bill_type === 'CONSUMPTION' ? b.consumption_amount : b.net_payable_amount;
+                    const payableStr = payableValue != null ? Math.round(payableValue).toLocaleString() : '-';
+                    const kwhValue = b.bill_type === 'CONSUMPTION' ? b.consumption_kwh : b.total_kwh;
+                    const kwhStr = kwhValue != null ? Math.round(kwhValue).toLocaleString() : '-';
                     const capacityStr = b.installed_capacity_kw ? Number(b.installed_capacity_kw).toFixed(2) : '-';
                     const rateStr = b.fit_rate ? Number(b.fit_rate).toFixed(4) : '-';
                     const mapInfo = typeof getPlantMapInfo === 'function' ? getPlantMapInfo(b) : { city: b.city || '', district: b.district || '', externalUrl: 'https://www.google.com/maps' };
@@ -1711,6 +1757,8 @@
                             <td class="py-3 px-4">
                                 <span class="font-bold text-brand-900 block">${b.bill_year_month || '-'}</span>
                                 <span class="text-xs text-slate-400 block">${b.billing_period || ''}</span>
+                                ${b.status === 'NEEDS_REVIEW' ? '<span class="inline-block mt-1 text-xs text-amber-800 bg-amber-100 rounded px-2 py-0.5" title="' + escapeBillHtml((b.parse_warnings || []).join('；')) + '">待核對</span>' : ''}
+                                ${b.bill_type === 'CONSUMPTION' ? '<span class="block text-xs text-slate-500">電力費用・不計入售電收益</span>' : ''}
                             </td>
                             <td class="py-3 px-4">
                                 <div class="flex items-center space-x-1.5 mb-1">
@@ -1954,128 +2002,7 @@
         // -------------------------------------------------------------
         // Client-side Taipower Bill Parsing Engine (Pure JS + PDF.js + Zone-Based Binarized OCR)
         // -------------------------------------------------------------
-        const KNOWN_PLANTS = {
-            '11-63-0824-95-9': {
-                site_name: '五甲尾',
-                customer_name: '中租電力科技股份有限公司',
-                contract_number: '11-PV-111-0233',
-                tax_id: '43941328',
-                plant_location: '高雄市岡山區嘉興段344、344-2等 (五甲尾滯洪池)',
-                city: '高雄市',
-                district: '岡山區',
-                lat: 22.8286,
-                lng: 120.3125,
-                map_query: '22.8286,120.3125',
-                installed_capacity_kw: 4999.2,
-                fit_rate: 4.8529,
-                taipower_branch: '高雄區營業處'
-            },
-            '08-40-8620-12-7': {
-                site_name: '美傢家具鹿港廠1',
-                customer_name: '美傢家具股份有限公司',
-                contract_number: '08-PV-109-0339',
-                tax_id: '23924765',
-                plant_location: '彰化縣鹿港鎮彰濱工業區鹿工路6號',
-                city: '彰化縣',
-                district: '鹿港鎮',
-                lat: 24.0685,
-                lng: 120.3976,
-                map_query: '彰化縣鹿港鎮鹿工路6號',
-                installed_capacity_kw: 1628.9,
-                fit_rate: 4.2444,
-                taipower_branch: '彰化區營業處'
-            },
-            '10-56-4770-02-1': {
-                site_name: '賴侯淑貞',
-                customer_name: '賴侯淑貞',
-                contract_number: '10-PV-106-0047',
-                tax_id: 'Q200880199',
-                plant_location: '彰化縣大城鄉頂莊段0453-0000地號',
-                city: '彰化縣',
-                district: '大城鄉',
-                lat: 23.8562,
-                lng: 120.2865,
-                map_query: '23.8562,120.2865',
-                installed_capacity_kw: 196.62,
-                fit_rate: 4.8111,
-                taipower_branch: '彰化區營業處'
-            },
-            '04-22-8469-91-3': {
-                site_name: '桃園蘆竹南工路一場',
-                customer_name: '中租迪和股份有限公司',
-                contract_number: '04-PV-109-0041',
-                tax_id: '05072925',
-                plant_location: '桃園市蘆竹區南工路41號（屋頂）一場',
-                city: '桃園市',
-                district: '蘆竹區',
-                lat: 25.0588,
-                lng: 121.2692,
-                map_query: '桃園市蘆竹區南工路41號',
-                installed_capacity_kw: 1943.50,
-                fit_rate: 5.0921,
-                taipower_branch: '桃園區營業處'
-            },
-            '18-35-9151-58-2': {
-                site_name: '高雄大寮磚子磘段',
-                customer_name: '中租迪和股份有限公司',
-                contract_number: '18-PV-109-0042',
-                tax_id: '05072925',
-                plant_location: '高雄市大寮區磚子磘段3362-1、3363~3374地號',
-                city: '高雄市',
-                district: '大寮區',
-                lat: 22.6178,
-                lng: 120.4182,
-                map_query: '22.6178,120.4182',
-                installed_capacity_kw: 693.00,
-                fit_rate: 4.6983,
-                taipower_branch: '鳳山區營業處'
-            },
-            '18-44-1100-22-1': {
-                site_name: '高雄小港同利路',
-                customer_name: '中租迪和股份有限公司',
-                contract_number: '18-PV-109-0447',
-                tax_id: '05072925',
-                plant_location: '高雄市小港區同利路20號',
-                city: '高雄市',
-                district: '小港區',
-                lat: 22.5535,
-                lng: 120.3632,
-                map_query: '高雄市小港區同利路20號',
-                installed_capacity_kw: 744.25,
-                fit_rate: 4.2968,
-                taipower_branch: '鳳山區營業處'
-            },
-            '03-54-8093-99-5': {
-                site_name: '宜蘭蘇澳新馬南路',
-                customer_name: '中租迪和股份有限公司',
-                contract_number: '03-PV-108-0126',
-                tax_id: '05072925',
-                plant_location: '宜蘭縣蘇澳鎮新馬南路36號',
-                city: '宜蘭縣',
-                district: '蘇澳鎮',
-                lat: 24.6195,
-                lng: 121.8258,
-                map_query: '宜蘭縣蘇澳鎮新馬南路36號',
-                installed_capacity_kw: 276.48,
-                fit_rate: 5.163,
-                taipower_branch: '宜蘭區營業處'
-            },
-            '11-73-5518-95-1': {
-                site_name: '高雄路竹永華路',
-                customer_name: '中租迪和股份有限公司',
-                contract_number: '11-PV-105-0164',
-                tax_id: '05072925',
-                plant_location: '高雄市路竹區永華路98、102號',
-                city: '高雄市',
-                district: '路竹區',
-                lat: 22.8632,
-                lng: 120.2584,
-                map_query: '高雄市路竹區永華路98號',
-                installed_capacity_kw: 499.40,
-                fit_rate: 4.8056,
-                taipower_branch: '高雄區營業處'
-            }
-        };
+        const KNOWN_PLANTS = {};
 
         function cleanNum(val) {
             if (val === null || val === undefined) return null;
@@ -2175,769 +2102,12 @@
                 ym_roc = `${rocY}年${rocM}月`;
                 ym_ad = `${rocY + 1911}-${String(rocM).padStart(2, '0')}`;
             } else {
-                const now = new Date();
-                ym_roc = `${now.getFullYear() - 1911}年${now.getMonth() + 1}月`;
-                ym_ad = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
             }
 
             return { period, start_ad, end_ad, ym_roc, ym_ad };
         }
 
-        function parseTaipowerBillFromText(rawText, rawLines, filename) {
-            const fullText = normalizeOcrNumericSpacing(rawText || '');
-            const lines = (rawLines || []).map(l => normalizeOcrNumericSpacing(l));
-
-            const data = {
-                filename: filename,
-                raw_text: fullText,
-                status: 'PARSED'
-            };
-
-            const isCppaNotice = /購電計費通知書|轉供度數|發電業者|發電電號/.test(fullText) || (filename && /EPC計費通知書|轉供/.test(filename));
-
-            // 1. 電號 (例如: 08-40-8620-12-7 或 10-56-4770-02-1 或 11-63-0824-95-9)
-            let m = fullText.match(/(\d{2}-\d{2}-\d{4}-\d{2}-\d{1})/) ||
-                    (filename ? filename.match(/(\d{2}-\d{2}-\d{4}-\d{2}-\d{1})/) : null);
-            data.electric_number = m ? m[1] : '';
-            if (!data.electric_number && filename && filename.includes('五甲尾')) {
-                data.electric_number = '11-63-0824-95-9';
-            }
-
-            // 2. 契約編號 (例如: 08-PV-109-0339 或 10-PV-106-0047 或 11-PV-111-0233)
-            m = fullText.match(/(\d{2}-[A-Za-z0-9]{2}-\d{3}-\d{4})/);
-            data.contract_number = m ? m[1] : '';
-
-            // 3. 計費期間與帳單年月
-            const dateInfo = extractPeriodAndDates(fullText, filename);
-            data.billing_period = dateInfo.period;
-            data.billing_start_ad = dateInfo.start_ad;
-            data.billing_end_ad = dateInfo.end_ad;
-            data.bill_year_month = dateInfo.ym_roc;
-            data.bill_year_month_ad = dateInfo.ym_ad;
-            if (isCppaNotice && data.billing_end_ad) {
-                const [ey, em] = data.billing_end_ad.split('-').map(Number);
-                if (ey && em) {
-                    data.bill_year_month = `${ey - 1911}年${em}月`;
-                    data.bill_year_month_ad = `${ey}-${String(em).padStart(2, '0')}`;
-                }
-            }
-
-            // 4. 用戶名稱與地址
-            data.customer_name = '';
-            data.customer_address = '';
-            for (let i = 0; i < lines.length; i++) {
-                if (lines[i].includes('先生/女士/寶號') && i > 0) {
-                    data.customer_name = lines[i - 1].replace(/先生\/女士\/寶號.*/, '').trim();
-                    for (let k = 1; k <= 5; k++) {
-                        if (i - k >= 0) {
-                            const cand = lines[i - k].trim();
-                            if (['市', '縣', '路', '街', '段', '號'].some(x => cand.includes(x)) && !cand.includes('股份有限公司')) {
-                                data.customer_address = cand;
-                                break;
-                            }
-                        }
-                    }
-                    break;
-                }
-            }
-            if (!data.customer_name) {
-                const mGen = fullText.match(/發電業者[：:\s]*([^\n\r]+)/);
-                if (mGen) {
-                    data.customer_name = mGen[1].trim();
-                } else {
-                    const mCo = (filename + '\n' + fullText).match(/([\u4e00-\u9fa5]{2,12}股份有限公司)/g);
-                    if (mCo) {
-                        const preferred = mCo.find(c => !c.includes('台灣電力') && !c.includes('中曜'));
-                        if (preferred) data.customer_name = preferred;
-                    }
-                }
-            }
-
-            // 5. 統一編號 (若為轉供通知書會有買方與賣方兩個統編，優先取發電業者統編)
-            const allTaxIds = [...fullText.matchAll(/統一編號[：:\s]*([0-9A-Z]{8,10})/g)].map(x => x[1]);
-            if (allTaxIds.length > 1 && isCppaNotice) {
-                data.tax_id = allTaxIds[allTaxIds.length - 1];
-            } else if (allTaxIds.length > 0) {
-                data.tax_id = allTaxIds[0];
-            } else {
-                data.tax_id = '';
-            }
-
-            // 6. 設置地點
-            m = fullText.match(/設置地點[：:\s]*([^\n\r]+)/);
-            data.plant_location = m ? m[1].trim() : '';
-
-            const cityM = data.plant_location.match(/(基隆市|台北市|新北市|桃園市|新竹市|新竹縣|苗栗縣|台中市|彰化縣|南投縣|雲林縣|嘉義市|嘉義縣|台南市|高雄市|屏東縣|宜蘭縣|花蓮縣|台東縣|澎湖縣|金門縣|連江縣)/);
-            data.city = cityM ? cityM[1] : '';
-            if (data.city) {
-                const distM = data.plant_location.match(new RegExp(data.city + '([^市縣0-9、]+?[市區鄉鎮])'));
-                data.district = distM ? distM[1] : '';
-            } else {
-                data.district = '';
-            }
-
-            // 7. 裝置容量 (Installed Capacity kW)
-            m = fullText.match(/併聯總裝置容量[^\d]*([0-9.]+)/) || fullText.match(/裝置容量[^\d]*([0-9.]+)/);
-            data.installed_capacity_kw = m ? cleanNum(m[1]) : null;
-
-            // 8. 購售電容量
-            m = fullText.match(/併聯總購售電容量[^\d]*([0-9.]+)/) || fullText.match(/購售電容量[^\d]*([0-9.]+)/);
-            data.grid_capacity_kw = m ? cleanNum(m[1]) : data.installed_capacity_kw;
-
-            // 9. 躉購費率 (元/度) — 支援 1~4 位小數 (如 5.163 或 4.8056)
-            m = fullText.match(/費率[：:\s\n\r]*([2-9]\.\d{1,4})/) || fullText.match(/\b([3-7]\.\d{3,4})\b/);
-            data.fit_rate = m ? parseFloat(m[1]) : null;
-
-            // 10. 機組與發電度數/金額拆解 (Multi-Strategy Extraction)
-            const machines = [];
-
-            // 策略 0A: 綠電轉供 / CPPA 購電計費通知書 (如中曜轉供通知書)
-            if (isCppaNotice) {
-                const cppaMatch = fullText.match(/(?:轉供度數|售電收入|計費度數)[\s\S]{0,80}?\b([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{4,8})\b/);
-                if (cppaMatch) {
-                    const kVal = cleanNum(cppaMatch[1]);
-                    if (kVal && kVal >= 100) {
-                        data.total_kwh = kVal;
-                        if (!data.taipower_branch) data.taipower_branch = '中曜股份有限公司 (售電轉供)';
-                    }
-                }
-            }
-
-            // 策略 0B: 台電官方計費度數公式比對 (最精準權威)
-            if (!data.total_kwh) {
-                let fMatch = fullText.match(/購電度數[^\r\n=＝]{2,60}[=＝]\s*([0-9,]+)/) ||
-                             fullText.match(/\([1I]\s*-\s*0\.\d+\s*%\s*\)\s*-\s*[0-9,]+\s*[=＝]\s*([0-9,]+)/) ||
-                             fullText.match(/[=＝]\s*([0-9,]+)\s*(?:度|$)/);
-                if (fMatch) {
-                    const kVal = cleanNum(fMatch[1]);
-                    if (kVal && kVal >= 10) {
-                        data.total_kwh = kVal;
-                    }
-                }
-            }
-
-            // 策略 1: 多機組行內明細辨識 (支援多機組案場加總，如蘆竹4機組、大寮2機組)
-            const extractedMachines = [];
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
-                const rowM = line.match(/(?:機組\s*(\d+))?\s*\b([3-7]\.\d{2,4})\s+([0-9,]{3,9})\s+([0-9,]{4,11})\b/);
-                if (rowM) {
-                    const r = parseFloat(rowM[2]);
-                    const k = cleanNum(rowM[3]);
-                    const a = cleanNum(rowM[4]);
-                    if (r && k && a && Math.abs(r * k - a) <= Math.max(50, a * 0.015)) {
-                        extractedMachines.push({
-                            name: rowM[1] ? `機組${rowM[1]}` : `機組${extractedMachines.length + 1}`,
-                            rate: r,
-                            kwh: Math.round(k),
-                            amount: Math.round(a)
-                        });
-                    }
-                }
-            }
-            if (extractedMachines.length > 0) {
-                machines.push(...extractedMachines);
-                const sumM = extractedMachines.reduce((sum, item) => sum + item.kwh, 0);
-                const sumA = extractedMachines.reduce((sum, item) => sum + item.amount, 0);
-                if (!data.total_kwh || sumM > data.total_kwh) {
-                    data.total_kwh = sumM;
-                }
-                if (!data.purchase_amount || sumA > data.purchase_amount) {
-                    data.purchase_amount = sumA;
-                }
-                if (!data.fit_rate) {
-                    data.fit_rate = extractedMachines.length === 1
-                        ? extractedMachines[0].rate
-                        : Number((data.purchase_amount / data.total_kwh).toFixed(4));
-                }
-            }
-
-            // 策略 2: 嚴格數學乘積反查 (僅比對 >= 1000 度，杜絕郵遞區號 804 / 門牌號碼 362 等小數字誤判)
-            const activeRate = data.fit_rate || (KNOWN_PLANTS[data.electric_number] ? KNOWN_PLANTS[data.electric_number].fit_rate : (filename && filename.includes('五甲尾') ? 4.8529 : null));
-            if (!data.total_kwh && activeRate) {
-                const allNums = [...fullText.matchAll(/\b([0-9,]{4,10})\b/g)]
-                    .map(x => parseInt(x[1].replace(/,/g, ''), 10))
-                    .filter(n => n >= 1000 && !(n >= 1911 && n <= 2099));
-                const minKwhThreshold = (data.installed_capacity_kw && data.installed_capacity_kw >= 1000) || (filename && filename.includes('五甲尾')) ? 10000 : 1000;
-                for (let k of allNums) {
-                    if (k < minKwhThreshold) continue;
-                    const expPurchase = Math.round(k * activeRate);
-                    const expTax = Math.round(expPurchase * 0.05);
-                    const expPayable = expPurchase + expTax;
-
-                    for (let a of allNums) {
-                        if (Math.abs(expPurchase - a) <= Math.max(15, expPurchase * 0.002)) {
-                            data.total_kwh = k;
-                            data.purchase_amount = a;
-                            machines.push({ name: isCppaNotice ? '綠電轉供' : '機組1', rate: activeRate, kwh: k, amount: a });
-                            break;
-                        } else if (Math.abs(expPayable - a) <= Math.max(20, expPayable * 0.002)) {
-                            data.total_kwh = k;
-                            data.purchase_amount = expPurchase;
-                            data.net_payable_amount = a;
-                            machines.push({ name: isCppaNotice ? '綠電轉供' : '機組1', rate: activeRate, kwh: k, amount: expPurchase });
-                            break;
-                        }
-                    }
-                    if (data.total_kwh) break;
-                }
-            }
-
-            // 策略 3: 正則模式匹配
-            if (!data.total_kwh) {
-                m = fullText.match(/[=＝]\s*([0-9,]+)\s*度/) || 
-                    fullText.match(/購電度數[：:\s]*([0-9,]+)/) ||
-                    fullText.match(/合計[：:\s]*([0-9,]+)\s*度/) ||
-                    fullText.match(/度數[：:\s\n\r]*([0-9,]+)\s*度/);
-                if (m) data.total_kwh = cleanNum(m[1]);
-            }
-
-            if (!data.fit_rate && activeRate) {
-                data.fit_rate = activeRate;
-            }
-            if (machines.length === 0 && data.total_kwh && data.fit_rate) {
-                machines.push({
-                    name: isCppaNotice ? '綠電轉供' : '機組1',
-                    rate: data.fit_rate,
-                    kwh: data.total_kwh,
-                    amount: data.purchase_amount || Math.round(data.total_kwh * data.fit_rate)
-                });
-            }
-
-            data.machines = machines;
-            data.machines_json = JSON.stringify(machines);
-
-            // 11. 金額欄位推算與驗證
-            if (!data.purchase_amount) {
-                m = fullText.match(/購電電費[：:\s\n\r]*([0-9,]+)/);
-                if (m) data.purchase_amount = cleanNum(m[1]);
-                else if (data.total_kwh && data.fit_rate) {
-                    data.purchase_amount = Math.round(data.total_kwh * data.fit_rate);
-                }
-            }
-
-            if (!data.tax_amount) {
-                m = fullText.match(/營業稅[：:\s\n\r]*([0-9,]+)/);
-                if (m) data.tax_amount = cleanNum(m[1]);
-                else if (data.purchase_amount) {
-                    data.tax_amount = Math.round(data.purchase_amount * 0.05);
-                }
-            }
-
-            m = fullText.match(/本期電表租費[：:\s\n\r]*([-0-9,]+)/) || fullText.match(/電表租費[：:\s\n\r]*([-0-9,]+)/);
-            data.meter_rental_amount = m ? cleanNum(m[1]) : 0;
-
-            if (!data.total_bill_amount) {
-                m = fullText.match(/[*＊]?本期電費合計[：:\s\n\r]*([0-9,]+)/);
-                if (m) data.total_bill_amount = cleanNum(m[1]);
-                else if (data.purchase_amount && data.tax_amount) {
-                    data.total_bill_amount = data.purchase_amount + data.tax_amount;
-                }
-            }
-
-            if (!data.net_payable_amount) {
-                const mAll = [...fullText.matchAll(/應付總金額[：:\s\n\r]*([0-9,]+)/g)];
-                if (mAll.length > 0) {
-                    const valid = mAll.map(x => cleanNum(x[1])).filter(n => n && n >= 100);
-                    if (valid.length) data.net_payable_amount = valid[0];
-                }
-            }
-            if (!data.net_payable_amount && data.total_bill_amount) {
-                data.net_payable_amount = data.total_bill_amount + (data.meter_rental_amount || 0);
-            } else if (!data.net_payable_amount && data.purchase_amount) {
-                data.net_payable_amount = data.purchase_amount + (data.tax_amount || 0) + (data.meter_rental_amount || 0);
-            }
-
-            // 12. 抄表日與服務處所
-            m = fullText.match(/本次抄表日[^\d]*([0-9]{2,3}年[0-9]{1,2}月[0-9]{1,2}日)/);
-            data.meter_read_curr = m ? m[1] : '';
-
-            m = fullText.match(/服務部門[：:]\s*([^\n\r]+)/);
-            if (m) data.taipower_branch = m[1].trim();
-
-            // 13. 銀行帳戶
-            for (let i = 0; i < lines.length; i++) {
-                if (lines[i].includes('銀行')) {
-                    let acc = lines[i].trim();
-                    if (i + 1 < lines.length && (lines[i + 1].includes('帳戶') || /\d+號/.test(lines[i + 1]))) {
-                        acc += ' ' + lines[i + 1].trim();
-                    }
-                    data.payment_account = acc.replace(/。/g, '');
-                    break;
-                }
-            }
-
-            // 14. 智慧案場關聯與預設值補齊 (進金生能源案場庫)
-            const known = KNOWN_PLANTS[data.electric_number];
-            if (known) {
-                if (!data.customer_name) data.customer_name = known.customer_name;
-                if (!data.contract_number) data.contract_number = known.contract_number;
-                if (!data.tax_id) data.tax_id = known.tax_id;
-                if (!data.plant_location) data.plant_location = known.plant_location;
-                if (!data.city) data.city = known.city;
-                if (!data.district) data.district = known.district;
-                if (!data.installed_capacity_kw) data.installed_capacity_kw = known.installed_capacity_kw;
-                if (!data.grid_capacity_kw) data.grid_capacity_kw = known.installed_capacity_kw;
-                if (!data.fit_rate) data.fit_rate = known.fit_rate;
-                if (!data.taipower_branch) data.taipower_branch = known.taipower_branch;
-                data.site_name = isCppaNotice ? `${known.site_name} (轉供計費)` : known.site_name;
-            }
-
-            // 檔名特徵覆蓋案場名稱 (如: 五甲尾、美傢、賴侯)
-            if (filename.includes('五甲尾') || data.electric_number === '11-63-0824-95-9') {
-                data.site_name = '五甲尾';
-                data.electric_number = '11-63-0824-95-9';
-                data.contract_number = '11-PV-111-0233';
-                data.installed_capacity_kw = 4999.2;
-                data.grid_capacity_kw = 4999.2;
-                data.fit_rate = 4.8529;
-                data.customer_name = '中租電力科技股份有限公司';
-                data.tax_id = '43941328';
-                data.plant_location = '高雄市岡山區嘉興段344、344-2等 (五甲尾滯洪池)';
-                data.city = '高雄市';
-                data.district = '岡山區';
-                data.meter_rental_amount = -983;
-                data.taipower_branch = '高雄區營業處';
-            } else if (filename.includes('美傢')) {
-                data.site_name = '美傢家具鹿港廠1';
-                if (!data.electric_number) data.electric_number = '08-40-8620-12-7';
-                if (!data.contract_number) data.contract_number = '08-PV-109-0339';
-                if (!data.installed_capacity_kw) data.installed_capacity_kw = 1628.9;
-                if (!data.fit_rate) data.fit_rate = 4.2444;
-            } else if (filename.includes('賴侯')) {
-                data.site_name = '賴侯淑貞';
-                if (!data.electric_number) data.electric_number = '10-56-4770-02-1';
-                if (!data.contract_number) data.contract_number = '10-PV-106-0047';
-                if (!data.installed_capacity_kw) data.installed_capacity_kw = 196.62;
-                if (!data.fit_rate) data.fit_rate = 4.8111;
-            }
-
-            // 若已有電號歷史，繼承靜態案場基本資料
-            if (data.electric_number && (typeof currentBills !== 'undefined' && currentBills)) {
-                const existing = currentBills.find(b => b.electric_number === data.electric_number && b.installed_capacity_kw);
-                if (existing) {
-                    if (!data.site_name) {
-                        const baseName = existing.site_name ? existing.site_name.replace(/\s*\(轉供計費\)/, '') : '';
-                        if (baseName && !/^\d{2}-\d{2}-\d{4}/.test(baseName)) {
-                            data.site_name = isCppaNotice ? `${baseName} (轉供計費)` : baseName;
-                        }
-                    }
-                    if (!data.customer_name) data.customer_name = existing.customer_name;
-                    if (!data.customer_address) data.customer_address = existing.customer_address;
-                    if (!data.tax_id) data.tax_id = existing.tax_id;
-                    if (!data.plant_location) data.plant_location = existing.plant_location;
-                    if (!data.city) data.city = existing.city;
-                    if (!data.district) data.district = existing.district;
-                    if (!data.installed_capacity_kw) data.installed_capacity_kw = existing.installed_capacity_kw;
-                    if (!data.grid_capacity_kw) data.grid_capacity_kw = existing.installed_capacity_kw;
-                    if (!data.fit_rate) data.fit_rate = existing.fit_rate;
-                    if (!data.contract_number) data.contract_number = existing.contract_number;
-                }
-            }
-
-            if (!data.site_name && data.plant_location) {
-                const derived = deriveSiteNameFromLocation(data.plant_location);
-                if (derived) data.site_name = isCppaNotice ? `${derived} (轉供計費)` : derived;
-            }
-            if (!data.site_name) {
-                data.site_name = filename.replace(/\.pdf$/i, '');
-            }
-
-            // 五甲尾 5MW 超大型案場強制鎖定與防污機制 (Sanity Guard)
-            if (data.electric_number === '11-63-0824-95-9' || (data.site_name && data.site_name.includes('五甲尾')) || (filename && filename.includes('五甲尾'))) {
-                data.site_name = '五甲尾';
-                data.electric_number = '11-63-0824-95-9';
-                data.contract_number = '11-PV-111-0233';
-                data.customer_name = '中租電力科技股份有限公司';
-                data.tax_id = '43941328';
-                data.plant_location = '高雄市岡山區嘉興段344、344-2等 (五甲尾滯洪池)';
-                data.city = '高雄市';
-                data.district = '岡山區';
-                data.installed_capacity_kw = 4999.2;
-                data.grid_capacity_kw = 4999.2;
-                data.fit_rate = 4.8529;
-                data.meter_rental_amount = -983;
-                data.taipower_branch = '高雄區營業處';
-                if (data.total_kwh && data.total_kwh < 10000) {
-                    data.total_kwh = null;
-                    data.purchase_amount = null;
-                    data.total_bill_amount = null;
-                    data.net_payable_amount = null;
-                    data.machines = [];
-                }
-            }
-
-            // 15. 數值連動推算防護
-            if (!data.purchase_amount && data.total_kwh && data.fit_rate) {
-                data.purchase_amount = Math.round(data.total_kwh * data.fit_rate);
-            }
-            if (!data.tax_amount && data.purchase_amount) {
-                data.tax_amount = Math.round(data.purchase_amount * 0.05);
-            }
-            if (!data.total_bill_amount && data.purchase_amount && data.tax_amount) {
-                data.total_bill_amount = data.purchase_amount + data.tax_amount;
-            }
-            if (!data.net_payable_amount && data.total_bill_amount) {
-                data.net_payable_amount = data.total_bill_amount + (data.meter_rental_amount || 0);
-            }
-
-            return data;
-        }
-
-        // -------------------------------------------------------------
-        // 台電電子帳單固定座標區塊去浮水印雙軌 OCR 引擎 (ROI Zone-Based Binarized OCR)
-        // 解決台電 PDF 全頁為純影像 (無文字層) 且中央有灰色台電浮水印干擾表格辨識之核心問題
-        // -------------------------------------------------------------
-        async function parseTaipowerCanvasByZones(renderedCanvas, baseData, filename) {
-            const W = renderedCanvas.width;
-            const H = renderedCanvas.height;
-
-            // Step 1: 影像二值化去浮水印 (Luminance < 185 保留純黑文字，>= 185 轉純白，100% 抹除台電淺灰圓形浮水印)
-            const cleanCanvas = document.createElement('canvas');
-            cleanCanvas.width = W;
-            cleanCanvas.height = H;
-            const cleanCtx = cleanCanvas.getContext('2d');
-            cleanCtx.drawImage(renderedCanvas, 0, 0);
-            const imgData = cleanCtx.getImageData(0, 0, W, H);
-            const px = imgData.data;
-            for (let i = 0; i < px.length; i += 4) {
-                const lum = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
-                const v = lum < 185 ? 0 : 255;
-                px[i] = v;
-                px[i + 1] = v;
-                px[i + 2] = v;
-                px[i + 3] = 255;
-            }
-            cleanCtx.putImageData(imgData, 0, 0);
-
-            // Step 2: 建立純數值與代碼區塊畫布 (numCanvas -> 使用 'eng' 高速精準辨識數字與電號)
-            const numZones = [
-                { id: 'PERIOD',   x: 0.58,  y: 0.110, w: 0.33,  h: 0.032 },
-                { id: 'TOPBAR',   x: 0.08,  y: 0.232, w: 0.81,  h: 0.030 },
-                { id: 'TOTALBOX', x: 0.18,  y: 0.258, w: 0.32,  h: 0.038 },
-                { id: 'BASIC',    x: 0.21,  y: 0.330, w: 0.095, h: 0.072 },
-                { id: 'MACHINES', x: 0.555, y: 0.360, w: 0.335, h: 0.068 },
-                { id: 'SUMMARY',  x: 0.765, y: 0.390, w: 0.125, h: 0.105 },
-                { id: 'FORMULA',  x: 0.12,  y: 0.520, w: 0.42,  h: 0.135 }
-            ];
-            let numH = 30;
-            const numY = [];
-            for (const z of numZones) {
-                const zh = Math.round(z.h * H);
-                numY.push({ id: z.id, y0: numH, y1: numH + zh });
-                numH += zh + 35;
-            }
-            const numCanvas = document.createElement('canvas');
-            numCanvas.width = Math.round(W * 0.85);
-            numCanvas.height = numH;
-            const nctx = numCanvas.getContext('2d');
-            nctx.fillStyle = '#FFFFFF';
-            nctx.fillRect(0, 0, numCanvas.width, numCanvas.height);
-            for (let i = 0; i < numZones.length; i++) {
-                const z = numZones[i], zy = numY[i];
-                nctx.drawImage(cleanCanvas, Math.round(z.x * W), Math.round(z.y * H), Math.round(z.w * W), Math.round(z.h * H), 15, zy.y0, Math.round(z.w * W), Math.round(z.h * H));
-            }
-
-            // Step 3: 建立繁體中文區塊畫布 (chiCanvas -> 使用 'chi_tra' 辨識計費期間、客戶寶號、設置地點、服務處所)
-            const chiZones = [
-                { id: 'PERIOD_CHI', x: 0.58, y: 0.105, w: 0.34, h: 0.038 },
-                { id: 'CUST',       x: 0.08, y: 0.135, w: 0.47, h: 0.060 },
-                { id: 'BANK',       x: 0.18, y: 0.258, w: 0.32, h: 0.038 },
-                { id: 'LOC',        x: 0.05, y: 0.665, w: 0.57, h: 0.080 }
-            ];
-            let chiH = 30;
-            const chiY = [];
-            for (const z of chiZones) {
-                const zh = Math.round(z.h * H);
-                chiY.push({ id: z.id, y0: chiH, y1: chiH + zh });
-                chiH += zh + 35;
-            }
-            const chiCanvas = document.createElement('canvas');
-            chiCanvas.width = Math.round(W * 0.62);
-            chiCanvas.height = chiH;
-            const cctx = chiCanvas.getContext('2d');
-            cctx.fillStyle = '#FFFFFF';
-            cctx.fillRect(0, 0, chiCanvas.width, chiCanvas.height);
-            for (let i = 0; i < chiZones.length; i++) {
-                const z = chiZones[i], zy = chiY[i];
-                nctx.drawImage(cleanCanvas, Math.round(z.x * W), Math.round(z.y * H), Math.round(z.w * W), Math.round(z.h * H), 15, zy.y0, Math.round(z.w * W), Math.round(z.h * H));
-            }
-
-            // Step 4: 雙軌並行執行 Tesseract OCR
-            const [engSettled, chiSettled] = await Promise.allSettled([
-                Tesseract.recognize(numCanvas, 'eng'),
-                Tesseract.recognize(chiCanvas, 'chi_tra')
-            ]);
-
-            const zoneMap = {};
-            for (const zy of numY) zoneMap[zy.id] = [];
-            for (const zy of chiY) zoneMap[zy.id] = [];
-
-            if (engSettled.status === 'fulfilled' && engSettled.value && engSettled.value.data) {
-                for (const line of (engSettled.value.data.lines || [])) {
-                    const cy = (line.bbox.y0 + line.bbox.y1) / 2;
-                    const matched = numY.find(z => cy >= z.y0 - 15 && cy <= z.y1 + 15);
-                    if (matched && line.text.trim()) {
-                        zoneMap[matched.id].push(normalizeOcrNumericSpacing(line.text.trim()));
-                    }
-                }
-            }
-            if (chiSettled.status === 'fulfilled' && chiSettled.value && chiSettled.value.data) {
-                for (const line of (chiSettled.value.data.lines || [])) {
-                    const cy = (line.bbox.y0 + line.bbox.y1) / 2;
-                    const matched = chiY.find(z => cy >= z.y0 - 15 && cy <= z.y1 + 15);
-                    if (matched && line.text.trim()) {
-                        zoneMap[matched.id].push(normalizeOcrNumericSpacing(line.text.trim().replace(/\s+/g, '')));
-                    }
-                }
-            }
-
-            // Step 5: 結構化解析各區塊數值
-            // 5.1 TOPBAR: 電號、契約編號、應付總金額
-            const topbarText = (zoneMap.TOPBAR || []).join(' ');
-            const mElec = topbarText.match(/(\d{2}-\d{2}-\d{4}-\d{2}-\d{1})/);
-            if (mElec) baseData.electric_number = mElec[1];
-            const mContract = topbarText.match(/(\d{2}-[A-Za-z0-9]{2}-\d{3}-\d{4})\s*([0-9,]{3,10})?/);
-            if (mContract) {
-                baseData.contract_number = mContract[1];
-                if (mContract[2]) {
-                    const payVal = cleanNum(mContract[2]);
-                    if (payVal && payVal >= 100) baseData.net_payable_amount = payVal;
-                }
-            }
-
-            // 5.2 TOTALBOX: 本期電費合計、入帳帳號
-            const totalBoxText = (zoneMap.TOTALBOX || []).join('\n');
-            const mTotalBoxAmt = totalBoxText.match(/\b([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{4,9})\b/);
-            if (mTotalBoxAmt) {
-                const tbVal = cleanNum(mTotalBoxAmt[1]);
-                if (tbVal && tbVal >= 100) baseData.total_bill_amount = tbVal;
-            }
-            const mBankAcc = totalBoxText.match(/\b(\d{11,16})\b/);
-            const bankChiText = (zoneMap.BANK || []).join(' ');
-            if (mBankAcc && !baseData.payment_account) {
-                const mBankName = bankChiText.match(/([\u4e00-\u9fa5]{3,12}(?:銀行|金庫|郵局)[\u4e00-\u9fa5]{0,6}(?:分行|部)?)/);
-                baseData.payment_account = `${mBankName ? mBankName[1] + ' ' : ''}${mBankAcc[1]}號帳戶`;
-            }
-
-            // 5.3 BASIC: 統一編號 (8碼) 與 併聯總裝置容量 / 購售電容量 (小數點後4位，如 276.4800)
-            const basicLines = zoneMap.BASIC || [];
-            const capacities = [];
-            for (const bl of basicLines) {
-                const mTax = bl.match(/\b([0-9A-Z]{8,10})\b/);
-                if (mTax && !bl.includes('.') && !bl.includes(',')) {
-                    baseData.tax_id = mTax[1];
-                    continue;
-                }
-                const mCap = bl.match(/(\d{1,4})\s*[.,]\s*(\d{4})\b/);
-                if (mCap) {
-                    const capVal = parseFloat(`${mCap[1]}.${mCap[2]}`);
-                    if (capVal > 0 && capVal < 50000) capacities.push(capVal);
-                }
-            }
-            if (capacities.length > 0) {
-                baseData.installed_capacity_kw = capacities[0];
-                baseData.grid_capacity_kw = capacities.length > 1 ? capacities[1] : capacities[0];
-            }
-
-            // 5.4 MACHINES: 機組1~N 費率、購電度數、購電金額 (支援 1~4 位小數費率與多機組加總)
-            const machineLines = zoneMap.MACHINES || [];
-            const parsedMachines = [];
-            for (const ml of machineLines) {
-                const mRow = ml.match(/([2-9]\.\d{1,4})\s+([0-9,]{2,9})\s+([0-9,]{3,11})/);
-                if (mRow) {
-                    const r = parseFloat(mRow[1]);
-                    const k = cleanNum(mRow[2]);
-                    const a = cleanNum(mRow[3]);
-                    if (r && k && a && Math.abs(r * k - a) <= Math.max(80, a * 0.02)) {
-                        parsedMachines.push({
-                            name: `機組${parsedMachines.length + 1}`,
-                            rate: r,
-                            kwh: Math.round(k),
-                            amount: Math.round(a)
-                        });
-                    }
-                }
-            }
-            if (parsedMachines.length > 0) {
-                baseData.machines = parsedMachines;
-                baseData.machines_json = JSON.stringify(parsedMachines);
-                baseData.total_kwh = parsedMachines.reduce((s, item) => s + item.kwh, 0);
-                baseData.purchase_amount = parsedMachines.reduce((s, item) => s + item.amount, 0);
-                baseData.fit_rate = parsedMachines.length === 1
-                    ? parsedMachines[0].rate
-                    : Number((baseData.purchase_amount / baseData.total_kwh).toFixed(4));
-            }
-
-            // 5.5 FORMULA: 購電度數計費公式交叉驗證 (例如 29,760x(1-0.0541%)-0= 29,744)
-            const formulaText = (zoneMap.FORMULA || []).join('\n');
-            const mFormulaEq = formulaText.match(/[=＝]\s*([0-9,]{2,9})/);
-            if (mFormulaEq && !baseData.total_kwh) {
-                const fk = cleanNum(mFormulaEq[1]);
-                if (fk && fk >= 10) baseData.total_kwh = fk;
-            }
-
-            // 5.6 SUMMARY: 購電電費、營業稅、本期電表租費/使用電能費用 (負值)、應付總金額
-            const summaryLines = zoneMap.SUMMARY || [];
-            let negRentSum = 0;
-            for (const sl of summaryLines) {
-                const mNeg = sl.match(/-\s*([0-9,]{1,6})/);
-                if (mNeg) {
-                    const v = cleanNum(mNeg[1]);
-                    if (v && v > 0 && v < 20000) negRentSum -= v;
-                }
-            }
-            if (negRentSum < 0) {
-                baseData.meter_rental_amount = negRentSum;
-            }
-
-            // 5.7 PERIOD_CHI & PERIOD: 計費期間與帳單期別
-            const periodCombined = [...(zoneMap.PERIOD_CHI || []), ...(zoneMap.PERIOD || [])].join(' ');
-            const pInfo = extractPeriodAndDates(periodCombined, filename);
-            if (pInfo.period) {
-                baseData.billing_period = pInfo.period;
-                baseData.billing_start_ad = pInfo.start_ad;
-                baseData.billing_end_ad = pInfo.end_ad;
-                baseData.bill_year_month = pInfo.ym_roc;
-                baseData.bill_year_month_ad = pInfo.ym_ad;
-            }
-
-            // 5.8 CUST & LOC: 客戶名稱、通訊地址、設置地點、服務處所
-            const custLines = zoneMap.CUST || [];
-            for (const cl of custLines) {
-                if (cl.includes('股份有限公司') || cl.includes('有限公司') || cl.includes('寶號')) {
-                    const cleanedCust = cl.replace(/先生.*|女士.*|寶號.*/g, '').trim();
-                    if (cleanedCust.length >= 2) baseData.customer_name = cleanedCust;
-                } else if (['市', '縣', '區', '路', '街', '號', '樓'].some(k => cl.includes(k)) && !baseData.customer_address) {
-                    baseData.customer_address = cl.replace(/^\d{3,5}/, '').trim();
-                }
-            }
-            if (!baseData.customer_name && baseData.tax_id === '05072925') {
-                baseData.customer_name = '中租迪和股份有限公司';
-            } else if (!baseData.customer_name && baseData.tax_id === '43941328') {
-                baseData.customer_name = '中租電力科技股份有限公司';
-            }
-
-            const locText = (zoneMap.LOC || []).join('\n');
-            const mLoc = locText.match(/設置地點[：:\s]*([^\n\r]+)/) || locText.match(/((?:基隆|台北|新北|桃園|新竹|苗栗|台中|彰化|南投|雲林|嘉義|台南|高雄|屏東|宜蘭|花蓮|台東|澎湖|金門|連江)[市縣][^\n\r]+)/);
-            if (mLoc && !baseData.plant_location) {
-                baseData.plant_location = mLoc[1].trim();
-                const cM = baseData.plant_location.match(/(基隆市|台北市|新北市|桃園市|新竹市|新竹縣|苗栗縣|台中市|彰化縣|南投縣|雲林縣|嘉義市|嘉義縣|台南市|高雄市|屏東縣|宜蘭縣|花蓮縣|台東縣|澎湖縣|金門縣|連江縣)/);
-                if (cM) {
-                    baseData.city = cM[1];
-                    const dM = baseData.plant_location.match(new RegExp(baseData.city + '([^市縣0-9、]+?[市區鄉鎮])'));
-                    if (dM) baseData.district = dM[1];
-                }
-            }
-            const mBranch = locText.match(/([\u4e00-\u9fa5]{2,4}區營業處)/);
-            if (mBranch && !baseData.taipower_branch) {
-                baseData.taipower_branch = mBranch[1];
-            }
-
-            // Step 6: 套用案場主檔、歷史電號繼承與金額連動驗證
-            const known = KNOWN_PLANTS[baseData.electric_number];
-            if (known) {
-                if (!baseData.customer_name) baseData.customer_name = known.customer_name;
-                if (!baseData.contract_number) baseData.contract_number = known.contract_number;
-                if (!baseData.tax_id) baseData.tax_id = known.tax_id;
-                if (!baseData.plant_location) baseData.plant_location = known.plant_location;
-                if (!baseData.city) baseData.city = known.city;
-                if (!baseData.district) baseData.district = known.district;
-                if (!baseData.installed_capacity_kw) baseData.installed_capacity_kw = known.installed_capacity_kw;
-                if (!baseData.grid_capacity_kw) baseData.grid_capacity_kw = known.installed_capacity_kw;
-                if (!baseData.fit_rate) baseData.fit_rate = known.fit_rate;
-                if (!baseData.taipower_branch) baseData.taipower_branch = known.taipower_branch;
-                baseData.site_name = known.site_name;
-            } else if (baseData.plant_location && (!baseData.site_name || baseData.site_name === filename.replace(/\.pdf$/i, ''))) {
-                const derived = deriveSiteNameFromLocation(baseData.plant_location);
-                if (derived) baseData.site_name = derived;
-            }
-
-            if (!baseData.purchase_amount && baseData.total_kwh && baseData.fit_rate) {
-                baseData.purchase_amount = Math.round(baseData.total_kwh * baseData.fit_rate);
-            }
-            if (!baseData.tax_amount && baseData.purchase_amount) {
-                baseData.tax_amount = Math.round(baseData.purchase_amount * 0.05);
-            }
-            if (!baseData.total_bill_amount && baseData.purchase_amount && baseData.tax_amount) {
-                baseData.total_bill_amount = baseData.purchase_amount + baseData.tax_amount;
-            }
-            if (!baseData.net_payable_amount && baseData.total_bill_amount) {
-                baseData.net_payable_amount = baseData.total_bill_amount + (baseData.meter_rental_amount || 0);
-            }
-            if (baseData.total_bill_amount && baseData.net_payable_amount && !baseData.meter_rental_amount) {
-                const diff = baseData.net_payable_amount - baseData.total_bill_amount;
-                if (diff < 0 && diff > -10000) baseData.meter_rental_amount = diff;
-            }
-
-            return baseData;
-        }
-
-        async function parsePdfClientSide(file) {
-            let fullText = "";
-            let lines = [];
-            let renderedCanvas = null;
-
-            if (window.pdfjsLib) {
-                try {
-                    const buffer = await file.arrayBuffer();
-                    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
-                    for (let i = 1; i <= Math.min(pdf.numPages, 3); i++) {
-                        const page = await pdf.getPage(i);
-                        const textContent = await page.getTextContent();
-                        let curLine = "";
-                        let lastY = null;
-                        for (let item of textContent.items) {
-                            if (!item.str) continue;
-                            const curY = item.transform ? item.transform[5] : null;
-                            if (lastY !== null && curY !== null && Math.abs(curY - lastY) > 5) {
-                                if (curLine.trim()) lines.push(curLine.trim());
-                                curLine = item.str;
-                            } else {
-                                curLine += (curLine ? " " : "") + item.str;
-                            }
-                            lastY = curY;
-                        }
-                        if (curLine.trim()) lines.push(curLine.trim());
-                        fullText += lines.join("\n") + "\n";
-
-                        // 若為第一頁，以 scale=2.0 繪製高解析 Canvas 供區塊去浮水印 OCR 引擎使用
-                        if (i === 1) {
-                            try {
-                                const viewport = page.getViewport({ scale: 2.0 });
-                                const canvas = document.createElement('canvas');
-                                canvas.width = viewport.width;
-                                canvas.height = viewport.height;
-                                const ctx = canvas.getContext('2d');
-                                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-                                renderedCanvas = canvas;
-                            } catch (e) {
-                                console.warn("Canvas render error:", e);
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.warn("Client PDF.js extract note:", e);
-                }
-            }
-
-            // Stage 1: 先以文字層初步解析 (支援原生文字 PDF 與綠電轉供通知書)
-            let parsed = parseTaipowerBillFromText(fullText, lines, file.name);
-
-            // Stage 2: 若為台電純影像電子帳單 (缺少購電度數、應付金額、裝置容量或計費期間)，啟動固定座標去浮水印雙軌 OCR 引擎！
-            if ((!parsed.total_kwh || !parsed.net_payable_amount || !parsed.installed_capacity_kw || !parsed.billing_period) && renderedCanvas && window.Tesseract) {
-                try {
-                    const statusText = document.getElementById('uploadStatusText');
-                    if (statusText) statusText.innerText = `正在啟動去浮水印區塊精準 OCR 辨識 (${file.name})...`;
-                    parsed = await parseTaipowerCanvasByZones(renderedCanvas, parsed, file.name);
-                } catch (ocrErr) {
-                    console.warn("Zone OCR fallback note:", ocrErr);
-                }
-            }
-
-            parsed.file_size = file.size;
-            return parsed;
-        }
+        async function parsePdfClientSide(file) { return recognizeBillPdf(file); }
 
         async function submitUpload() {
             if (selectedUploadFiles.length === 0) return;
@@ -2949,41 +2119,22 @@
             statusBox.classList.remove('hidden');
             uploadBtn.disabled = true;
 
+            BillAuth.requireUser();
             let successCount = 0;
+            let reviewCount = 0;
             const errors = [];
-
-            // 檢查本地是否有 Python Starlette 伺服器運作中
-            let isLocalBackend = false;
-            try {
-                const testRes = await fetch('/api/kpi', { method: 'GET', signal: AbortSignal.timeout(800) });
-                if (testRes.ok) isLocalBackend = true;
-            } catch(e) {}
 
             for (let i = 0; i < selectedUploadFiles.length; i++) {
                 const f = selectedUploadFiles[i];
                 statusText.innerText = `正在解析並儲存 [${i + 1}/${selectedUploadFiles.length}]：${f.name}...`;
 
                 try {
-                    // 若在本地伺服器運作，優先呼叫 Python 後端 OCR 與檔案儲存
-                    if (isLocalBackend) {
-                        const formData = new FormData();
-                        formData.append('files', f);
-                        const res = await fetch('/api/upload', { method: 'POST', body: formData });
-                        if (res.ok) {
-                            const data = await res.json();
-                            if (data.results && data.results.length > 0) {
-                                successCount++;
-                                continue;
-                            }
-                        }
-                    }
-
                     // 瀏覽器端純前端智慧解析引擎（支援 GitHub Pages 離線/雲端混合）
                     const billData = await parsePdfClientSide(f);
 
                     // 存入 IndexedDB、LocalStorage，若有連線 Supabase 則同步上傳雲端
                     await SupabaseBillService.saveBill(billData, f);
-                    successCount++;
+                    if (billData.status === "NEEDS_REVIEW") reviewCount++; else successCount++;
                 } catch (err) {
                     console.error("Upload error for file:", f.name, err);
                     errors.push(`${f.name}: ${err.message}`);
@@ -2999,15 +2150,12 @@
             // 重新載入數據與更新介面
             await loadAllData();
 
-            if (successCount > 0) {
-                if (SupabaseBillService.isConfigured()) {
-                    showToast(`🎉 成功上傳並辨識 ${successCount} 份電費單，已同步至 Supabase 雲端資料庫！全團隊皆可即時查看。`);
-                } else {
-                    showToast(`🎉 成功辨識 ${successCount} 份電費單！（提醒：目前為本地展示模式，僅存於這台電腦，請連線 Supabase 即可與團隊同步）`);
-                }
-            }
-            if (errors.length > 0) {
-                showToast(`部分檔案處理異常：${errors.join('; ')}`, true);
+            if (successCount || reviewCount) showToast("已儲存 " + (successCount + reviewCount) + " 份電費單；" + successCount + " 份辨識完整，" + reviewCount + " 份待核對。", reviewCount > 0);
+            if (errors.length) {
+                statusBox.classList.remove('hidden');
+                statusText.textContent = '處理失敗：' + errors.join('；');
+                document.getElementById('uploadModal').classList.remove('hidden');
+                showToast("有 " + errors.length + " 份未完成儲存，請查看上傳視窗。", true);
             }
         }
 
@@ -3331,7 +2479,7 @@
 
             // 2. 注入已載入電費單中的案場
             if (currentBills && currentBills.length > 0) {
-                currentBills.forEach(b => {
+                currentBills.filter(b => b.bill_type !== 'CONSUMPTION').forEach(b => {
                     if (b.electric_number && !plantMap.has(b.electric_number)) {
                         plantMap.set(b.electric_number, {
                             electric_number: b.electric_number,
@@ -3464,7 +2612,7 @@
             const cEnd = new Date(endStr + 'T23:59:59');
 
             // 篩選該案場之帳單
-            let plantBills = currentBills.filter(b => b.electric_number === plantKey || (plantKey === '11-63-0824-95-9' && (b.site_name === '五甲尾' || (b.filename && b.filename.includes('五甲尾')))));
+            let plantBills = currentBills.filter(b => b.bill_type !== 'CONSUMPTION').filter(b => b.electric_number === plantKey || (plantKey === '11-63-0824-95-9' && (b.site_name === '五甲尾' || (b.filename && b.filename.includes('五甲尾')))));
 
             const rowData = [];
             plantBills.forEach(b => {

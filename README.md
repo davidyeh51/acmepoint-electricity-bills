@@ -1,98 +1,66 @@
-# 進金生能源 6692 ｜ 客戶太陽能電費單智能管理系統
-> **AcmePoint Energy Customer Solar Feed-in Tariff Billing Database & Cloud Portal**  
-> 具備 AI 智慧辨識 (OCR)、全文關鍵字檢索、派送清冊關聯、電費單 PDF 線上預覽下載，以及 Supabase 雲端資料庫／Storage 雙向串接。
+# 進金生能源｜電費單管理系統
 
-🌐 **GitHub Pages 線上預覽入口**：[https://davidyeh51.github.io/acmepoint-electricity-bills/](https://davidyeh51.github.io/acmepoint-electricity-bills/)
+[開啟網站](https://davidyeh51.github.io/acmepoint-electricity-bills/)
 
----
+GitHub Pages 提供介面，Supabase Auth、PostgreSQL RLS 與私人 Storage 提供登入、資料存取及 PDF 保護。本機 Python 服務提供相同帳號驗證與 RapidOCR 辨識。
 
-## 🌟 核心功能特色
+## 帳號與權限
 
-1. **AI 智慧辨識 (RapidOCR & PyMuPDF)**：
-   - 自動提取台電「再生能源電能躉購電費通知單」中 25+ 項核心結構化欄位（電號、契約編號、用戶名稱、統編、帳單期別、計費期間、裝置容量、購電度數、躉購費率、各機組發電拆解明細、營業稅、電表租費、應付總金額、匯款銀行帳號等）。
-2. **多維度關鍵字檢索**：
-   - 支援依**案場名稱**（如：美傢、賴侯）、**電號**、**契約編號**、**設置地點**、**客戶名稱**、**統一編號**即時模糊搜尋。
-3. **派送清冊一鍵貼上關聯**：
-   - 收到每日派送 Email 通知時，直接將派送清冊文字貼上，系統自動識別電號並綁定案場名稱，永久記憶。
-4. **電費單原檔線上預覽與下載**：
-   - 列表提供一鍵下載 PDF 原檔；提供雙欄對照視窗（左側看 PDF，右側即時核對解析數據與各機組費率）。
-5. **Excel 報表一鍵匯出**：
-   - 支援將全庫或當前搜尋篩選結果導出為標準格式之 `.xlsx` 試算表。
-6. **Supabase ✕ GitHub Pages 雲端雙向串接**：
-   - 前端純靜態部署於 GitHub Pages，透過 `@supabase/supabase-js@2` 串接 Supabase PostgreSQL 與 Storage 儲存桶。
-   - 本地端提供 Python 辨識引擎與離線 SQLite 備份。
+登入狀態使用專屬儲存鍵，與相同 GitHub Pages 網域的其他系統分開。以帳號及密碼登入；帳號在內部對應至專用的 Auth email alias，使用者不需要輸入電子郵件。
 
----
+| 權限 | 功能 |
+| --- | --- |
+| 使用者 | 查詢、上傳、核對、修正、匯出帳單與檢視原始 PDF、修改自己的密碼 |
+| 管理者 | 使用者全部功能，以及新增帳號、調整角色、啟用／停用帳號、重設密碼 |
 
-## 🚀 雲端 Supabase 連線設定（快速上手）
+角色與啟用狀態保存在 bill_app_users，由資料庫政策與帳號管理服務驗證。使用者不能修改自己的角色，也不能只靠更動瀏覽器儲存內容取得權限。停用帳號後，新的資料與檔案請求會被拒絕；先前核發的 PDF 短效網址最長有效五分鐘。
 
-本專案支援免後端純靜態直連 Supabase BaaS：
+初始帳號為 davidyeh（管理者）及 ivychung（使用者）。初始密碼由管理者提供，不存放在原始碼。可使用右上角「修改密碼」變更。
 
-### 步驟 1：建立 Supabase 資料表與儲存桶
-1. 前往 [Supabase Console](https://supabase.com/) 登入您的專案。
-2. 進入左側選單的 **SQL Editor**。
-3. 開啟本專案內的 [`supabase-schema.sql`](./supabase-schema.sql)，複製全文並貼上至 SQL Editor 點擊 **Run**。
-   - 此腳本會自動建立 `public.electricity_bills` 資料表、`public.site_mappings` 案場對照表。
-   - 強制啟用 **RLS (Row Level Security)** 行級安全防護。
-   - 自動建立 `bills` 公開檔案儲存桶 (Storage Bucket)。
-   - 寫入目前 2 筆案場種子資料。
+## 辨識與核對
 
-### 步驟 2：在網頁介面啟用連線
-1. 開啟 [GitHub Pages 網站](https://davidyeh51.github.io/acmepoint-electricity-bills/)。
-2. 點擊頂部右上角的 **「本地展示模式 (點擊設定 Supabase)」** 狀態標籤。
-3. 貼入您的 Supabase **Project URL** 與 **Anon Public Key**（於 Supabase Settings → API 取得）。
-4. 點擊 **「儲存並測試連線」**，狀態將轉為 **🟢 Supabase 雲端已連線**！
+- 先依頁面座標重建 PDF 文字列；內容不完整時進行繁體中文與英文的整頁 OCR，支援多頁。
+- 加總不同費率的全部機組，保留零發電量、負應付金額及舊式正數列示的表租扣款。
+- 帳單年月取自通知單標題，計費起迄日期分開儲存。無法辨識日期時不以今天代填。
+- 以機組、購電電費、營業稅、電費合計和扣款交叉核對。缺漏或不符的資料標記「待核對」。
+- PDF 上傳或資料庫儲存失敗時顯示錯誤，不顯示已同步成功。
+- 用電繳費憑證標記為 CONSUMPTION，不計入售電收益。維運費用試算等非帳單文件保留來源紀錄，排除帳單匯入。
 
----
+## 部署與環境
 
-## 💻 本地端運行指南
+前端不需要編譯，GitHub Pages 從 main 根目錄發布。瀏覽器端僅使用公開的 Supabase publishable／anon key；service role key 只由 Edge Function 環境提供。
 
-若您在辦公電腦需離線處理大量掃描件，可直接使用本機端運行：
+新專案先執行 supabase-schema.sql。既有專案的變更來源分別保存在：
 
-### 1. 一鍵雙擊啟動 (Windows)
-在資料夾內直接雙擊：
-👉 `啟動電費單資料庫系統.bat`
-將自動啟動本地伺服器並開啟瀏覽器至 `http://127.0.0.1:8501`。
+- sql/bill_app_users.sql
+- sql/bill_document_types.sql
+- sql/bill_access.sql
 
-### 2. 命令列工具 (`manage_bills.py`)
-```bash
-# 掃描資料夾內新加入的電費單 PDF 並自動辨識入庫
-python manage_bills.py sync
+部署 supabase/functions/bill-account-admin/index.ts 為 bill-account-admin。函式自行以 Auth API 驗證 access token，再查詢本系統的有效管理者資格；未登入或一般使用者無法建立帳號。不提供公開註冊或初始化入口。
 
-# 條列資料庫中所有電費單記錄與累計 KPI
-python manage_bills.py list
+新的環境須由可信任管理者在 Supabase Auth Admin 介面／API 建立第一位使用者，並在 bill_app_users 加入對應的 UUID、帳號與管理者角色。後續帳號均可由網站內的帳號管理建立。不得將 service role key 或初始密碼寫入前端或提交到 Git。
 
-# 關鍵字檢索電費單
-python manage_bills.py search 美傢
+PDF 原檔、SQLite、OCR 暫存、資料匯入清單與瀏覽器測試輸出已排除於 Git；原檔改存於私人 bills bucket，登入後產生短效下載網址。過去公開版本的 Git 歷史不會因新版本權限而自動消失。
 
-# 匯出資料庫至 Excel
-python manage_bills.py export -o 客戶電費單清冊.xlsx
+## 本機執行
 
-# 啟動 Web 服務
-python manage_bills.py web --port 8501
-```
+Python 3.10+：
 
----
+~~~powershell
+python -m pip install -r requirements.txt
+python -m uvicorn bill_system.server:app --host 127.0.0.1 --port 8501
+~~~
 
-## 📁 檔案結構說明
+介面直接使用雲端帳號與資料；本機 /api/* 和原始檔路徑也需要有效的 Supabase bearer token。修改專案時可透過 SUPABASE_URL、SUPABASE_PUBLISHABLE_KEY 指定連線。
 
-```
-.
-├── index.html                     # GitHub Pages 根目錄前端 (含 Supabase JS 整合)
-├── supabase-client.js             # Supabase 客戶端模組與展示模式相容層
-├── supabase-schema.sql            # Supabase PostgreSQL 資料表、RLS 政策與 Storage 設定腳本
-├── manage_bills.py                # 本地 CLI 管理與同步腳本
-├── 啟動電費單資料庫系統.bat         # Windows 一鍵啟動批次檔
-├── 客戶電費單資料庫/
-│   ├── electricity_bills.db       # 本地 SQLite 資料庫
-│   ├── 08-40-8620-12-7_211307_1.pdf # 美傢家具鹿港廠1 電費單原檔
-│   └── 10-56-4770-02-1_211458_1.pdf # 賴侯淑貞 電費單原檔
-└── bill_system/                   # 本地 Python Starlette 後端與 RapidOCR 引擎
-    ├── parser.py                  # 智慧電費單辨識模組
-    ├── database.py                # 本地 SQLite 存取與 FTS5 檢索
-    ├── sync_service.py            # 資料夾掃描與 SHA-256 去重服務
-    └── server.py                  # 本地 API 伺服器
-```
+~~~powershell
+node --test tests/recognition.test.cjs
+python -m unittest discover -s tests
+~~~
 
----
-進金生能源服務股份有限公司 (AcmePoint Energy Services Co., Ltd. 6692) ｜ 運維管理部
+## 批次匯入
+
+scripts/prepare_sources.py 使用本機 PDF 轉 Markdown 技能，將繁體 Markdown 與圖片放在來源旁，並保留 PDF。以 BILLS_SOURCE_ROOT 指定兩個案場共用的父目錄；輸出先放在唯一暫存目錄。
+
+scripts/prepare_bill_import.py 使用四個有界工作程序辨識，於 .system_generated/ 留下可恢復的快取、錯誤、重複及待核對清單。匯入前需審核清單；不要直接將原始資料加入 GitHub Pages。
+\n完成 OCR 後，以 scripts/audit_bill_import.py 重新套用目前解析規則，檢查重複、期別衝突與非帳單文件。通過後，以 scripts/import_bills.py <已審核清單.json> 寫入私人儲存桶；密碼僅透過程序環境變數 BILLS_PASSWORD 提供。\n

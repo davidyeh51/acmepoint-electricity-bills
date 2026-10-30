@@ -23,3 +23,10 @@ test_export.xlsx
 acmepoint-inspection-platform/
 客服管理平台/
 
+
+# Bill originals and browser/OCR artifacts stay private
+客戶電費單資料庫/
+.playwright-cli/
+output/
+supabase/.temp/
+!requirements.txt

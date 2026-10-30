@@ -1,0 +1,79 @@
+[
+  {
+    "name": "multiple_machine_rates_and_header_number",
+    "text": "115年10月再生能源電能躉購電費通知單\n計費期間：115年08月13日~115年10月14日\n測試能源有限公司\n先生/女士/寶號\n電號\n契約編號\n應付總金額\n12-34-5678-90-1\n12-PV-109-0001\n121,781元\n*本期電費合計\n122,299\n統一編號\n12345678\n併聯總裝置容量\n94.5700\n機組1\n7.3297\n6387\n46,815元\n機組2\n5.9697\n11669\n69,660元\n購電電費\n116,475元\n營業稅\n5,824元\n本期電表租費\n-518元\n應付總金額\n121,781元\n購電度數18,160x(1-0.1332%)-80=18,056度\n設置地點：台南市學甲區測試路1號",
+    "expected": {
+      "total_kwh": 18056,
+      "purchase_amount": 116475,
+      "net_payable_amount": 121781,
+      "bill_year_month_ad": "2026-10",
+      "status": "PARSED"
+    }
+  },
+  {
+    "name": "zero_generation_negative_payable",
+    "text": "115年07月再生能源電能躉購電費通知單\n計費期間：115年06月01日~115年06月30日\n測試能源有限公司\n先生/女士/寶號\n電號12-34-5678-90-1\n併聯總裝置容量997.9900\n機組1 4.2402 0 0元\n機組2 4.2402 0 0元\n購電電費0元\n營業稅0元\n本期電費合計0元\n本期電表租費-983元\n應付總金額-983元\n購電度數0x(1-0.0087%)=0度\n設置地點：台南市學甲區測試路1號\n統一編號12345678",
+    "expected": {
+      "total_kwh": 0,
+      "purchase_amount": 0,
+      "net_payable_amount": -983,
+      "meter_rental_amount": -983,
+      "bill_year_month_ad": "2026-07",
+      "status": "PARSED"
+    }
+  },
+  {
+    "name": "old_rental_positive_is_deduction",
+    "text": "110年07月再生能源電能躉購電費通知單\n計費期間：110年06月01日~110年06月30日\n測試能源有限公司\n先生/女士/寶號\n12-34-5678-90-1\n併聯總裝置容量999.46\n機組01 4.2402 58345 247,394元\n機組02 4.2402 58345 247,394元\n購電電費494,788元\n營業稅24,739元\n電費合計519,527元\n本期電表租費983元\n應付總金額518,544元\n購電度數117800(1-0.0087%)-1100=116690度\n設置地點：台南市學甲區測試路1號\n統一編號12345678",
+    "expected": {
+      "total_kwh": 116690,
+      "net_payable_amount": 518544,
+      "meter_rental_amount": -983,
+      "status": "PARSED"
+    }
+  },
+  {
+    "name": "no_date_must_not_default_to_today",
+    "text": "沒有帳單日期的無效文件",
+    "expected": {
+      "bill_year_month_ad": null,
+      "status": "NEEDS_REVIEW"
+    }
+  },
+  {
+    "name": "ocr_numeric_spaces_and_quotes",
+    "text": "115年10月再生能源電能躉購電費通知單\n計費期間：115年08月13日~115年10月14日\n測試能源有限公司\n先生/女士/寶號\n電號\n契約編號\n應付總金額\n12-34-5678-90-1\n12-PV-109-0001\n121, 781元\n*本期電費合計\n122,299\n統一編號\n12345678\n併聯總裝置容量\n94. 5700\n機組1\n“7. 3297\n6387\n46,815元\n機組2\n5.9697\n11669\n69,660元\n購電電費\n116,475元\n營業稅\n5,824元\n本期電表租費\n-518元\n應付總金額\n121, 781元\n購電度數18,160x(1-0.1332%)-80=18,056度\n設置地點：台南市學甲區測試路1號",
+    "expected": {
+      "total_kwh": 18056,
+      "purchase_amount": 116475,
+      "net_payable_amount": 121781,
+      "bill_year_month_ad": "2026-10",
+      "status": "PARSED"
+    }
+  },
+  {
+    "name": "header_amount_survives_ocr_summary_label_error",
+    "text": "115年10月再生能源電能躉購電費通知單\n計費期間：115年08月13日~115年10月14日\n測試能源有限公司\n先生/女士/寶號\n電號\n契約編號\n應竺總金額\n12-34-5678-90-1\n12-PV-109-0001\n121,781元\n*本期電費合計\n551L774\n統一編號\n12345678\n併聯總裝置容量\n94.5700\n機組1\n7.3297\n6387\n46,815元\n機組2\n5.9697\n11669\n69,660元\n購電電費\n116,475元\n營業稅\n5,824元\n本期電表租費\n-518元\n應竺總金額\n121,781元\n購電度數18,160x(1-0.1332%)-80=18,056度\n設置地點：台南市學甲區測試路1號",
+    "expected": {
+      "total_kwh": 18056,
+      "purchase_amount": 116475,
+      "net_payable_amount": 121781,
+      "bill_year_month_ad": "2026-10",
+      "status": "PARSED"
+    }
+  },
+  {
+    "name": "transmission_charge_is_not_solar_income",
+    "filename": "台電費用通知單11506.pdf",
+    "text": "台灣電力公司\n輸電費率\n編號\n用戶電號\n用戶表號\n發電電號\n發電表號\n當月服務使用量(度)\n(元/度)\n費用(元)\n276\n98765432109\nXL12345678\n12345678901\nTI87654321\n108,614\n0.0778\n8,450",
+    "expected": {
+      "electric_number": "12-34-5678-90-1",
+      "bill_type": "CONSUMPTION",
+      "consumption_kwh": 108614,
+      "consumption_amount": 8450,
+      "total_kwh": null,
+      "net_payable_amount": null,
+      "status": "PARSED"
+    }
+  }
+]

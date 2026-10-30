@@ -54,299 +54,7 @@ const PdfStorageDB = {
 };
 
 // 2. 初始展示種子資料 (Fallback Seed Bills)
-const SEED_BILLS = [
-  {
-    id: 1,
-    filename: "08-40-8620-12-7_211307_1.pdf",
-    file_url: "客戶電費單資料庫/08-40-8620-12-7_211307_1.pdf",
-    electric_number: "08-40-8620-12-7",
-    contract_number: "08-PV-109-0339",
-    site_name: "美傢家具鹿港廠1",
-    customer_name: "中租迪和股份有限公司",
-    customer_address: "114 台北市內湖區瑞光路362號8樓至12樓",
-    tax_id: "05072925",
-    bill_year_month: "115年10月",
-    bill_year_month_ad: "2026-10",
-    billing_period: "115年09月01日~115年09月30日",
-    billing_start_ad: "2026-09-01",
-    billing_end_ad: "2026-09-30",
-    plant_location: "彰化縣鹿港鎮彰濱工業區鹿工路6號",
-    city: "彰化縣",
-    district: "鹿港鎮",
-    installed_capacity_kw: 1628.9,
-    grid_capacity_kw: 1628.9,
-    total_kwh: 231396,
-    fit_rate: 4.2444,
-    purchase_amount: 982137,
-    tax_amount: 49107,
-    total_bill_amount: 1031244,
-    meter_rental_amount: -1628,
-    net_payable_amount: 1029616,
-    payment_account: "彰化商業銀行民生分行95106999900835號帳戶",
-    taipower_branch: "彰化區營業處核算（收費）課",
-    taipower_tel: "(04)7256461",
-    meter_read_curr: "115年10月01日",
-    machines: [
-      { name: "機組1", rate: 4.2444, kwh: 70638, amount: 299816 },
-      { name: "機組2", rate: 4.2444, kwh: 160758, amount: 682321 }
-    ],
-    status: "PARSED"
-  },
-  {
-    id: 2,
-    filename: "10-56-4770-02-1_211458_1.pdf",
-    file_url: "客戶電費單資料庫/10-56-4770-02-1_211458_1.pdf",
-    electric_number: "10-56-4770-02-1",
-    contract_number: "10-PV-106-0047",
-    site_name: "賴侯淑貞",
-    customer_name: "中租迪和股份有限公司",
-    customer_address: "114 台北市內湖區瑞光路362號8樓至12樓",
-    tax_id: "05072925",
-    bill_year_month: "115年10月",
-    bill_year_month_ad: "2026-10",
-    billing_period: "115年09月04日~115年10月05日",
-    billing_start_ad: "2026-09-04",
-    billing_end_ad: "2026-10-05",
-    plant_location: "彰化縣大城鄉頂莊段0453-0000地號",
-    city: "彰化縣",
-    district: "大城鄉",
-    installed_capacity_kw: 196.62,
-    grid_capacity_kw: 196.62,
-    total_kwh: 28062,
-    fit_rate: 4.8111,
-    purchase_amount: 135009,
-    tax_amount: 6750,
-    total_bill_amount: 141759,
-    meter_rental_amount: -249,
-    net_payable_amount: 141510,
-    payment_account: "永豐商業銀行營業部99717300000067號帳戶",
-    taipower_branch: "台南區營業處核算（收費）課",
-    taipower_tel: "(06)2160121",
-    meter_read_curr: "115年10月06日",
-    machines: [
-      { name: "機組1", rate: 4.8111, kwh: 28062, amount: 135009 }
-    ],
-    status: "PARSED"
-  },
-  {
-    id: 56,
-    filename: "04-22-8469-91-3_210692_1.pdf",
-    file_url: "https://cowljafosekwvxithwjd.supabase.co/storage/v1/object/public/bills/bills/1792553820844_04-22-8469-91-3_210692_1.pdf",
-    electric_number: "04-22-8469-91-3",
-    contract_number: "04-PV-109-0041",
-    site_name: "桃園蘆竹南工路一場",
-    customer_name: "中租迪和股份有限公司",
-    customer_address: "台北市內湖區瑞光路362號8~12樓",
-    tax_id: "05072925",
-    bill_year_month: "115年10月",
-    bill_year_month_ad: "2026-10",
-    billing_period: "115年09月01日~115年09月30日",
-    plant_location: "桃園市蘆竹區南工路41號（屋頂）一場",
-    city: "桃園市",
-    district: "蘆竹區",
-    installed_capacity_kw: 1943.50,
-    grid_capacity_kw: 1943.50,
-    total_kwh: 215798,
-    fit_rate: 5.0921,
-    purchase_amount: 1098871,
-    tax_amount: 54944,
-    total_bill_amount: 1153815,
-    meter_rental_amount: -996,
-    net_payable_amount: 1152819,
-    payment_account: "永豐商業銀行營業部 99717300000443號帳戶",
-    taipower_branch: "桃園區營業處",
-    taipower_tel: "(03)3392121",
-    meter_read_curr: "115年10月01日",
-    machines: [
-      { name: "機組1", rate: 5.1630, kwh: 53950, amount: 278544 },
-      { name: "機組2", rate: 5.0685, kwh: 53950, amount: 273446 },
-      { name: "機組3", rate: 5.0685, kwh: 53950, amount: 273446 },
-      { name: "機組4", rate: 5.0685, kwh: 53948, amount: 273435 }
-    ],
-    status: "PARSED"
-  },
-  {
-    id: 57,
-    filename: "18-35-9151-58-2_210632_1.pdf",
-    file_url: "https://cowljafosekwvxithwjd.supabase.co/storage/v1/object/public/bills/bills/1792553828311_18-35-9151-58-2_210632_1.pdf",
-    electric_number: "18-35-9151-58-2",
-    contract_number: "18-PV-109-0042",
-    site_name: "高雄大寮磚子磘段",
-    customer_name: "中租迪和股份有限公司",
-    customer_address: "台北市內湖區瑞光路362號6樓",
-    tax_id: "05072925",
-    bill_year_month: "115年10月",
-    bill_year_month_ad: "2026-10",
-    billing_period: "115年09月01日~115年09月30日",
-    billing_start_ad: "2026-09-01",
-    billing_end_ad: "2026-09-30",
-    plant_location: "高雄市大寮區磚子磘段3362-1、3363~3374地號",
-    city: "高雄市",
-    district: "大寮區",
-    installed_capacity_kw: 693.00,
-    grid_capacity_kw: 693.00,
-    total_kwh: 69896,
-    fit_rate: 4.6983,
-    purchase_amount: 328392,
-    tax_amount: 16420,
-    total_bill_amount: 344812,
-    meter_rental_amount: -1008,
-    net_payable_amount: 343804,
-    payment_account: "華南商業銀行民生分行 98935000000849號帳戶",
-    taipower_branch: "鳳山區營業處",
-    taipower_tel: "(07)7410111",
-    meter_read_curr: "115年10月01日",
-    machines: [
-      { name: "機組1", rate: 4.6983, kwh: 50325, amount: 236442 },
-      { name: "機組2", rate: 4.6983, kwh: 19571, amount: 91950 }
-    ],
-    status: "PARSED"
-  },
-  {
-    id: 58,
-    filename: "18-44-1100-22-1_210650_1.pdf",
-    file_url: "https://cowljafosekwvxithwjd.supabase.co/storage/v1/object/public/bills/bills/1792553834218_18-44-1100-22-1_210650_1.pdf",
-    electric_number: "18-44-1100-22-1",
-    contract_number: "18-PV-109-0447",
-    site_name: "高雄小港同利路",
-    customer_name: "中租迪和股份有限公司",
-    customer_address: "台北市內湖區瑞光路362號8樓",
-    tax_id: "05072925",
-    bill_year_month: "115年10月",
-    bill_year_month_ad: "2026-10",
-    billing_period: "115年09月01日~115年09月30日",
-    billing_start_ad: "2026-09-01",
-    billing_end_ad: "2026-09-30",
-    plant_location: "高雄市小港區同利路20號",
-    city: "高雄市",
-    district: "小港區",
-    installed_capacity_kw: 744.25,
-    grid_capacity_kw: 744.25,
-    total_kwh: 91797,
-    fit_rate: 4.2968,
-    purchase_amount: 394433,
-    tax_amount: 19722,
-    total_bill_amount: 414155,
-    meter_rental_amount: -983,
-    net_payable_amount: 413172,
-    payment_account: "彰化商業銀行民生分行 95106999900315號帳戶",
-    taipower_branch: "鳳山區營業處",
-    taipower_tel: "(07)7410111",
-    meter_read_curr: "115年10月01日",
-    machines: [
-      { name: "機組1", rate: 4.2968, kwh: 91797, amount: 394433 }
-    ],
-    status: "PARSED"
-  },
-  {
-    id: 59,
-    filename: "11-73-5518-95-1_212818_1.pdf",
-    file_url: "https://cowljafosekwvxithwjd.supabase.co/storage/v1/object/public/bills/bills/1793238282909_11-73-5518-95-1_212818_1.pdf",
-    electric_number: "11-73-5518-95-1",
-    contract_number: "11-PV-105-0164",
-    site_name: "高雄路竹永華路",
-    customer_name: "中租迪和股份有限公司",
-    customer_address: "台北市內湖區瑞光路362號8樓",
-    tax_id: "05072925",
-    bill_year_month: "115年9月",
-    bill_year_month_ad: "2026-09",
-    billing_period: "115年09月01日~115年09月30日",
-    billing_start_ad: "2026-09-01",
-    billing_end_ad: "2026-09-30",
-    plant_location: "高雄市路竹區永華路98、102號",
-    city: "高雄市",
-    district: "路竹區",
-    installed_capacity_kw: 499.40,
-    grid_capacity_kw: 499.40,
-    total_kwh: 3907,
-    fit_rate: 4.8056,
-    purchase_amount: 18775,
-    tax_amount: 939,
-    total_bill_amount: 19714,
-    meter_rental_amount: -347,
-    net_payable_amount: 19367,
-    payment_account: "彰化商業銀行民生分行 95100099900198號帳戶",
-    taipower_branch: "高雄區營業處",
-    taipower_tel: "(07)5513291",
-    meter_read_curr: "115年10月01日",
-    machines: [
-      { name: "機組1", rate: 4.8056, kwh: 3907, amount: 18775 }
-    ],
-    status: "PARSED"
-  },
-  {
-    id: 60,
-    filename: "1150901-1150930中租迪和股份有限公司EPC計費通知書11-73-5518-95-1.pdf",
-    file_url: "https://cowljafosekwvxithwjd.supabase.co/storage/v1/object/public/bills/bills/1793238288130_1150901-1150930_______EPC_____.pdf",
-    electric_number: "11-73-5518-95-1",
-    contract_number: "11-PV-105-0164",
-    site_name: "高雄路竹永華路 (轉供計費)",
-    customer_name: "中租迪和股份有限公司",
-    customer_address: "台北市內湖區瑞光路362號",
-    tax_id: "05072925",
-    bill_year_month: "115年9月",
-    bill_year_month_ad: "2026-09",
-    billing_period: "115年09月01日~115年09月30日",
-    billing_start_ad: "2026-09-01",
-    billing_end_ad: "2026-09-30",
-    plant_location: "高雄市路竹區永華路98、102號",
-    city: "高雄市",
-    district: "路竹區",
-    installed_capacity_kw: 499.40,
-    grid_capacity_kw: 499.40,
-    total_kwh: 52240,
-    fit_rate: 4.8056,
-    purchase_amount: 251045,
-    tax_amount: 12552,
-    total_bill_amount: 263597,
-    meter_rental_amount: 0,
-    net_payable_amount: 263597,
-    payment_account: "中曜股份有限公司 (綠電轉供購電計費通知書)",
-    taipower_branch: "中曜股份有限公司 (售電轉供)",
-    taipower_tel: "統一編號 91061096",
-    meter_read_curr: "115年09月30日",
-    machines: [
-      { name: "綠電轉供", rate: 4.8056, kwh: 52240, amount: 251045 }
-    ],
-    status: "PARSED"
-  },
-  {
-    id: 61,
-    filename: "03-54-8093-99-5_213400_1.pdf",
-    file_url: "https://cowljafosekwvxithwjd.supabase.co/storage/v1/object/public/bills/bills/1793238289402_03-54-8093-99-5_213400_1.pdf",
-    electric_number: "03-54-8093-99-5",
-    contract_number: "03-PV-108-0126",
-    site_name: "宜蘭蘇澳新馬南路",
-    customer_name: "中租迪和股份有限公司",
-    customer_address: "台北市內湖區瑞光路362號8樓至12樓",
-    tax_id: "05072925",
-    bill_year_month: "115年10月",
-    bill_year_month_ad: "2026-10",
-    billing_period: "115年09月18日~115年10月20日",
-    billing_start_ad: "2026-09-18",
-    billing_end_ad: "2026-10-20",
-    plant_location: "宜蘭縣蘇澳鎮新馬南路36號",
-    city: "宜蘭縣",
-    district: "蘇澳鎮",
-    installed_capacity_kw: 276.48,
-    grid_capacity_kw: 276.48,
-    total_kwh: 29744,
-    fit_rate: 5.163,
-    purchase_amount: 153568,
-    tax_amount: 7678,
-    total_bill_amount: 161246,
-    meter_rental_amount: -260,
-    net_payable_amount: 160986,
-    payment_account: "台灣新光商業銀行松竹分行 99519600000078號帳戶",
-    taipower_branch: "宜蘭區營業處",
-    taipower_tel: "(03)9354800",
-    meter_read_curr: "115年10月21日",
-    machines: [
-      { name: "機組1", rate: 5.163, kwh: 29744, amount: 153568 }
-    ],
-    status: "PARSED"
-  }
-];
+
 
 // 預設專案連線設定（全團隊開箱即用，免任何手動配置）
 window.DEFAULT_SUPABASE_CONFIG = window.DEFAULT_SUPABASE_CONFIG || {
@@ -411,14 +119,10 @@ const SupabaseBillService = {
 
     if (url && anonKey && window.supabase) {
       try {
-        supabaseInstance = window.supabase.createClient(url.trim(), anonKey.trim());
+        supabaseInstance = window.supabase.createClient(url.trim(), anonKey.trim(), { auth: { storageKey: 'acmepoint-bills-auth-v1', persistSession: true, autoRefreshToken: true } });
         localStorage.setItem('SB_URL', url.trim());
         localStorage.setItem('SB_ANON_KEY', anonKey.trim());
         
-        // 連線成功後，於背景自動嘗試將離線暫存的本地電費單（如五甲尾）同步至雲端
-        setTimeout(() => {
-          this.syncLocalBillsToCloud().catch(err => console.warn('Auto sync local bills error:', err));
-        }, 1500);
 
         return supabaseInstance;
       } catch (e) {
@@ -459,6 +163,8 @@ const SupabaseBillService = {
 
   // 核心上傳與儲存整合函式：同時處理本機 IndexedDB/LocalStorage 與 Supabase 雲端
   async saveBill(billData, fileBlob) {
+    BillAuth.requireUser();
+    if (!this.isConfigured()) throw new Error('雲端連線尚未設定，無法儲存帳單。');
     // 1. 若有檔案二進制，存入 IndexedDB 供後續隨時預覽與下載
     if (fileBlob) {
       await PdfStorageDB.savePdf(billData.filename, fileBlob);
@@ -518,7 +224,14 @@ const SupabaseBillService = {
           taipower_tel: billData.taipower_tel,
           meter_read_curr: billData.meter_read_curr,
           machines_json: billData.machines || [],
-          status: 'PARSED',
+          status: billData.status || 'NEEDS_REVIEW',
+          bill_type: billData.bill_type || 'FIT',
+          consumption_amount: billData.consumption_amount ?? null,
+          consumption_kwh: billData.consumption_kwh ?? null,
+          parse_warnings: billData.parse_warnings || [],
+          raw_text: billData.raw_text || null,
+          extraction_mode: billData.extraction_mode || null,
+          file_hash: billData.file_hash || null,
           updated_at: new Date().toISOString()
         };
 
@@ -564,10 +277,11 @@ const SupabaseBillService = {
           billData.synced_to_cloud = true;
           this.saveLocalBill(billData);
         } else {
-          console.warn("Supabase upsert warning:", error);
+          throw new Error("雲端資料儲存失敗：" + error.message);
         }
       } catch (err) {
         console.error("Cloud sync error:", err);
+        throw err;
       }
     }
 
@@ -576,59 +290,29 @@ const SupabaseBillService = {
 
   // 取得真實可下載 / 預覽的 URL
   async getBillFileUrl(bill) {
+    BillAuth.requireUser();
     if (!bill) return '';
-    // 先看 IndexedDB 是否有原檔
-    if (bill.filename) {
-      const blob = await PdfStorageDB.getPdf(bill.filename);
-      if (blob) {
-        return URL.createObjectURL(blob);
-      }
+    const value = bill.file_url || '';
+    let objectPath = '';
+    if (value.startsWith('storage://bills/')) objectPath = value.slice('storage://bills/'.length);
+    else if (value.includes('/storage/v1/object/')) {
+      const match = new URL(value).pathname.match(/\/storage\/v1\/object\/(?:public|sign|authenticated)\/bills\/(.+)/);
+      if (match) objectPath = decodeURIComponent(match[1]);
     }
-    return bill.file_url || (bill.filename ? `客戶電費單資料庫/${bill.filename}` : '');
+    if (objectPath) {
+      const {data,error} = await supabaseInstance.storage.from('bills').createSignedUrl(objectPath, 300);
+      if (error) throw new Error('取得檔案權限失敗：' + error.message);
+      return data.signedUrl;
+    }
+    const blob = await PdfStorageDB.getPdf(bill.filename);
+    if (blob) return URL.createObjectURL(blob);
+    throw new Error('此帳單尚未有可用的雲端 PDF，請重新上傳原檔。');
   },
 
   // 查詢電費單清單
   async fetchBills({ keyword = '', customer = '', month = '', city = '', sortBy = 'id', order = 'desc' } = {}) {
-    if (!this.isConfigured()) {
-      // 合併使用者本地上傳之電費單與種子資料
-      const customList = this.getLocalBills();
-      let list = [...customList, ...SEED_BILLS];
-      
-      // 去重 (依 filename 或 electric_number + month)
-      const seen = new Set();
-      list = list.filter(b => {
-        const key = b.filename || `${b.electric_number}_${b.bill_year_month}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-
-      if (keyword) {
-        const kw = keyword.toLowerCase();
-        list = list.filter(b => 
-          (b.site_name && b.site_name.toLowerCase().includes(kw)) ||
-          (b.electric_number && b.electric_number.toLowerCase().includes(kw)) ||
-          (b.contract_number && b.contract_number.toLowerCase().includes(kw)) ||
-          (b.customer_name && b.customer_name.toLowerCase().includes(kw)) ||
-          (b.plant_location && b.plant_location.toLowerCase().includes(kw)) ||
-          (b.tax_id && b.tax_id.includes(kw))
-        );
-      }
-      if (customer) list = list.filter(b => b.customer_name === customer);
-      if (month) list = list.filter(b => b.bill_year_month === month);
-      if (city) list = list.filter(b => b.city === city);
-
-      // 排序
-      list.sort((a, b) => {
-        let vA = a[sortBy] ?? a.id;
-        let vB = b[sortBy] ?? b.id;
-        if (order === 'desc') return vA < vB ? 1 : -1;
-        return vA > vB ? 1 : -1;
-      });
-
-      return { bills: list, total: list.length, isDemo: true };
-    }
-
+    BillAuth.requireUser();
+    if (!this.isConfigured()) throw new Error('雲端連線尚未設定。');
     // 查詢 Supabase PostgreSQL
     let query = supabaseInstance.from('electricity_bills').select('*', { count: 'exact' });
 
@@ -672,7 +356,8 @@ const SupabaseBillService = {
   },
 
   async fetchKPIs() {
-    const { bills } = await this.fetchBills();
+    const { bills: allBills } = await this.fetchBills();
+    const bills = allBills.filter(b => b.bill_type !== 'CONSUMPTION');
     const plantSet = new Set(bills.map(b => b.electric_number).filter(Boolean));
     const custSet = new Set(bills.map(b => b.customer_name).filter(Boolean));
 
@@ -695,6 +380,7 @@ const SupabaseBillService = {
   },
 
   async importDispatchText(text) {
+    BillAuth.requireUser();
     const lines = text.trim().split(/\r?\n/).filter(l => l.trim());
     const records = [];
     const seen = new Set();
@@ -817,6 +503,7 @@ const SupabaseBillService = {
   },
 
   async uploadPdfFile(fileOrBlob, customFilename = '') {
+    BillAuth.requireUser();
     if (!this.isConfigured() || !supabaseInstance) {
       return '';
     }
@@ -832,20 +519,19 @@ const SupabaseBillService = {
         .upload(storagePath, fileOrBlob, { cacheControl: '3600', upsert: true, contentType: 'application/pdf' });
 
       if (error) {
-        console.warn("Storage upload note:", error);
-        return '';
+        throw new Error("PDF 雲端上傳失敗：" + error.message);
       }
 
-      const { data: pubData } = supabaseInstance.storage.from('bills').getPublicUrl(storagePath);
-      return pubData ? pubData.publicUrl : '';
+      return 'storage://bills/' + storagePath;
     } catch (e) {
       console.warn("Storage upload failed:", e);
-      return '';
+      throw e;
     }
   },
 
   // 自動將瀏覽器本地離線上傳之電費單（如五甲尾）同步至 Supabase 雲端
   async syncLocalBillsToCloud() {
+    BillAuth.requireUser();
     if (!this.isConfigured() || !supabaseInstance) {
       return { success: false, syncedCount: 0, reason: '未連線 Supabase' };
     }
@@ -859,7 +545,7 @@ const SupabaseBillService = {
     for (let b of customList) {
       try {
         // 若此筆已標記同步完成且已有雲端 URL，直接跳過，避免拿本機舊快取重複覆寫雲端最新修正資料
-        if (b.synced_to_cloud && b.file_url && b.file_url.includes('supabase.co')) {
+        if (b.synced_to_cloud && b.file_url && (b.file_url.includes('supabase.co') || b.file_url.startsWith('storage://bills/'))) {
           continue;
         }
 
@@ -870,7 +556,7 @@ const SupabaseBillService = {
           .eq('filename', b.filename)
           .maybeSingle();
 
-        if (existingCheck && existingCheck.total_kwh > 0 && existingCheck.installed_capacity_kw > 0 && existingCheck.net_payable_amount > 0) {
+        if (existingCheck && ['PARSED','MANUAL_EDITED'].includes(existingCheck.status)) {
           b.synced_to_cloud = true;
           syncedCount++;
           continue;
@@ -878,7 +564,7 @@ const SupabaseBillService = {
 
         let cloudFileUrl = b.file_url;
         // 若尚未有雲端 Storage 連結（或仍是 blob: 本地臨時連結），嘗試上傳 PDF 二進制
-        if (!cloudFileUrl || cloudFileUrl.startsWith('blob:') || !cloudFileUrl.includes('supabase.co')) {
+        if (!cloudFileUrl || cloudFileUrl.startsWith('blob:') || !(cloudFileUrl.includes('supabase.co') || cloudFileUrl.startsWith('storage://bills/'))) {
           if (b.filename) {
             const blob = await PdfStorageDB.getPdf(b.filename);
             if (blob) {
@@ -923,7 +609,8 @@ const SupabaseBillService = {
           taipower_tel: b.taipower_tel,
           meter_read_curr: b.meter_read_curr,
           machines_json: b.machines || [],
-          status: 'PARSED',
+          status: b.status || 'NEEDS_REVIEW',
+          parse_warnings: b.parse_warnings || [],
           updated_at: new Date().toISOString()
         };
 
@@ -997,29 +684,15 @@ const SupabaseBillService = {
 
   // 更新特定電費單資料（支援線上預覽核對時直接修改保存）
   async updateBill(id, fields) {
-    if (!id) return;
-
-    // 1. 更新本機 LocalStorage
-    const localList = this.getLocalBills();
-    const idx = localList.findIndex(b => b.id == id);
-    if (idx >= 0) {
-      localList[idx] = { ...localList[idx], ...fields, updated_at: new Date().toISOString() };
-      localStorage.setItem('CUSTOM_LOCAL_BILLS', JSON.stringify(localList));
-    }
-
-    // 2. 更新 Supabase 雲端
-    if (this.isConfigured() && supabaseInstance) {
-      try {
-        const payload = { ...fields, updated_at: new Date().toISOString() };
-        const { error } = await supabaseInstance
-          .from('electricity_bills')
-          .update(payload)
-          .eq('id', id);
-        if (error) console.warn("Supabase updateBill warning:", error);
-      } catch (err) {
-        console.error("Supabase updateBill error:", err);
-      }
-    }
+    BillAuth.requireUser();
+    if (!id) throw new Error('找不到電費單。');
+    const {data: previous,error: readError} = await supabaseInstance.from('electricity_bills').select('*').eq('id',id).single();
+    if (readError) throw readError;
+    const validated = validateBillRecognition({...previous,...fields});
+    const payload = {...fields,status:validated.status === 'PARSED' ? 'MANUAL_EDITED' : 'NEEDS_REVIEW',parse_warnings:validated.parse_warnings,updated_at:new Date().toISOString()};
+    const {data,error} = await supabaseInstance.from('electricity_bills').update(payload).eq('id',id).select('id').single();
+    if (error || !data) throw new Error('雲端儲存失敗：' + (error?.message || '沒有更新任何帳單'));
+    this.saveLocalBill({...previous,...payload});
   },
 
   // 產生一鍵分享連結（附帶已設定之 Supabase 憑證，供團隊無痛連線）

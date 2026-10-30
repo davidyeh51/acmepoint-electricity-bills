@@ -68,113 +68,69 @@ CREATE INDEX IF NOT EXISTS idx_eb_city ON public.electricity_bills(city);
 ALTER TABLE public.electricity_bills ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.site_mappings ENABLE ROW LEVEL SECURITY;
 
--- 5. 制定 RLS 存取政策 (Policies)
--- (A) 允許公開讀取 (任何人皆可檢索電費單與案場)
-DROP POLICY IF EXISTS "允許公開讀取電費單" ON public.electricity_bills;
-CREATE POLICY "允許公開讀取電費單" ON public.electricity_bills FOR SELECT USING (true);
 
-DROP POLICY IF EXISTS "允許公開讀取案場對照" ON public.site_mappings;
-CREATE POLICY "允許公開讀取案場對照" ON public.site_mappings FOR SELECT USING (true);
+insert into storage.buckets(id,name,public) values('bills','bills',false) on conflict(id) do update set public=false;
 
--- (B) 允許新增與更新 (支援前端或 Python 本地腳本同步)
-DROP POLICY IF EXISTS "允許寫入電費單" ON public.electricity_bills;
-CREATE POLICY "允許寫入電費單" ON public.electricity_bills FOR ALL USING (true) WITH CHECK (true);
+create table if not exists public.bill_app_users (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  username text not null unique check (username ~ '^[a-z][a-z0-9_]{2,31}$'),
+  role text not null check (role in ('admin','user')),
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+alter table public.bill_app_users enable row level security;
+revoke all on public.bill_app_users from anon, authenticated;
+grant select on public.bill_app_users to authenticated;
+grant all on public.bill_app_users to service_role;
+drop policy if exists bill_users_read_self on public.bill_app_users;
+create policy bill_users_read_self on public.bill_app_users
+for select to authenticated using (user_id = (select auth.uid()));
+alter table public.electricity_bills add column if not exists parse_warnings jsonb not null default '[]'::jsonb;
+create index if not exists electricity_bills_file_hash_idx on public.electricity_bills(file_hash);
 
-DROP POLICY IF EXISTS "允許寫入案場對照" ON public.site_mappings;
-CREATE POLICY "允許寫入案場對照" ON public.site_mappings FOR ALL USING (true) WITH CHECK (true);
+alter table public.electricity_bills add column if not exists bill_type text not null default 'FIT' check (bill_type in ('FIT','CONSUMPTION'));
+alter table public.electricity_bills add column if not exists consumption_amount numeric;
 
--- 6. 建立檔案儲存桶 (Storage Bucket: bills)
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('bills', 'bills', true)
-ON CONFLICT (id) DO UPDATE SET public = true;
+-- App membership is checked live; disabling an account immediately blocks database writes.
+drop policy if exists "允許公開讀取電費單" on public.electricity_bills;
+drop policy if exists "允許寫入電費單" on public.electricity_bills;
+drop policy if exists "允許公開讀取案場對照" on public.site_mappings;
+drop policy if exists "允許寫入案場對照" on public.site_mappings;
+revoke all on public.electricity_bills, public.site_mappings from anon, authenticated;
+grant select, insert, update, delete on public.electricity_bills, public.site_mappings to authenticated;
+revoke all on sequence public.electricity_bills_id_seq from anon, authenticated;
+grant usage, select on sequence public.electricity_bills_id_seq to authenticated;
 
--- 7. 儲存桶存取政策 (Storage Policies)
-DROP POLICY IF EXISTS "允許公開檢視電費單檔案" ON storage.objects;
-CREATE POLICY "允許公開檢視電費單檔案" ON storage.objects FOR SELECT USING (bucket_id = 'bills');
+alter table public.electricity_bills enable row level security;
+drop policy if exists bill_members_read on public.electricity_bills;
+create policy bill_members_read on public.electricity_bills for select to authenticated using (exists (select 1 from public.bill_app_users m where m.user_id = (select auth.uid()) and m.active));
+drop policy if exists bill_members_insert on public.electricity_bills;
+create policy bill_members_insert on public.electricity_bills for insert to authenticated with check (exists (select 1 from public.bill_app_users m where m.user_id = (select auth.uid()) and m.active));
+drop policy if exists bill_members_update on public.electricity_bills;
+create policy bill_members_update on public.electricity_bills for update to authenticated using (exists (select 1 from public.bill_app_users m where m.user_id = (select auth.uid()) and m.active)) with check (exists (select 1 from public.bill_app_users m where m.user_id = (select auth.uid()) and m.active));
+drop policy if exists bill_admin_delete on public.electricity_bills;
+create policy bill_admin_delete on public.electricity_bills for delete to authenticated using (exists (select 1 from public.bill_app_users m where m.user_id = (select auth.uid()) and m.active and m.role = 'admin'));
 
-DROP POLICY IF EXISTS "允許上傳電費單檔案" ON storage.objects;
-CREATE POLICY "允許上傳電費單檔案" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'bills');
+alter table public.site_mappings enable row level security;
+drop policy if exists bill_members_read on public.site_mappings;
+create policy bill_members_read on public.site_mappings for select to authenticated using (exists (select 1 from public.bill_app_users m where m.user_id = (select auth.uid()) and m.active));
+drop policy if exists bill_members_insert on public.site_mappings;
+create policy bill_members_insert on public.site_mappings for insert to authenticated with check (exists (select 1 from public.bill_app_users m where m.user_id = (select auth.uid()) and m.active));
+drop policy if exists bill_members_update on public.site_mappings;
+create policy bill_members_update on public.site_mappings for update to authenticated using (exists (select 1 from public.bill_app_users m where m.user_id = (select auth.uid()) and m.active)) with check (exists (select 1 from public.bill_app_users m where m.user_id = (select auth.uid()) and m.active));
+drop policy if exists bill_admin_delete on public.site_mappings;
+create policy bill_admin_delete on public.site_mappings for delete to authenticated using (exists (select 1 from public.bill_app_users m where m.user_id = (select auth.uid()) and m.active and m.role = 'admin'));
+drop policy if exists "允許公開檢視電費單檔案" on storage.objects;
+drop policy if exists "允許上傳電費單檔案" on storage.objects;
+drop policy if exists "允許更新電費單檔案" on storage.objects;
+update storage.buckets set public=false where id='bills';
+drop policy if exists bill_members_read_files on storage.objects;
+create policy bill_members_read_files on storage.objects for select to authenticated using (bucket_id='bills' and exists (select 1 from public.bill_app_users m where m.user_id = (select auth.uid()) and m.active));
+drop policy if exists bill_members_upload_files on storage.objects;
+create policy bill_members_upload_files on storage.objects for insert to authenticated with check (bucket_id='bills' and exists (select 1 from public.bill_app_users m where m.user_id = (select auth.uid()) and m.active));
+drop policy if exists bill_members_update_files on storage.objects;
+create policy bill_members_update_files on storage.objects for update to authenticated using (bucket_id='bills' and exists (select 1 from public.bill_app_users m where m.user_id = (select auth.uid()) and m.active)) with check (bucket_id='bills' and exists (select 1 from public.bill_app_users m where m.user_id = (select auth.uid()) and m.active));
+drop policy if exists bill_admin_delete_files on storage.objects;
+create policy bill_admin_delete_files on storage.objects for delete to authenticated using (bucket_id='bills' and exists (select 1 from public.bill_app_users m where m.user_id = (select auth.uid()) and m.active and m.role = 'admin'));
 
-DROP POLICY IF EXISTS "允許更新電費單檔案" ON storage.objects;
-CREATE POLICY "允許更新電費單檔案" ON storage.objects FOR UPDATE USING (bucket_id = 'bills');
-
--- 8. 預置現有種子資料 (Initial Seed Data)
-INSERT INTO public.site_mappings (electric_number, site_name)
-VALUES 
-    ('08-40-8620-12-7', '美傢家具鹿港廠1'),
-    ('10-56-4770-02-1', '賴侯淑貞')
-ON CONFLICT (electric_number) DO UPDATE SET site_name = excluded.site_name;
-
-INSERT INTO public.electricity_bills (
-    filename, electric_number, contract_number, site_name, customer_name, customer_address,
-    tax_id, bill_year_month, bill_year_month_ad, billing_period, billing_start_ad, billing_end_ad,
-    plant_location, city, district, installed_capacity_kw, grid_capacity_kw, total_kwh, fit_rate,
-    purchase_amount, tax_amount, total_bill_amount, meter_rental_amount, net_payable_amount,
-    payment_account, taipower_branch, taipower_tel, meter_read_curr, status
-) VALUES 
-(
-    '08-40-8620-12-7_211307_1.pdf',
-    '08-40-8620-12-7',
-    '08-PV-109-0339',
-    '美傢家具鹿港廠1',
-    '中租迪和股份有限公司',
-    '114 台北市內湖區瑞光路362號8樓至12樓',
-    '05072925',
-    '115年10月',
-    '2026-10',
-    '115年09月01日~115年09月30日',
-    '2026-09-01',
-    '2026-09-30',
-    '彰化縣鹿港鎮上林段598、599地號',
-    '彰化縣',
-    '鹿港鎮',
-    1628.9,
-    1628.9,
-    231396,
-    4.2444,
-    982137,
-    49107,
-    1031244,
-    -1628,
-    1029616,
-    '彰化商業銀行民生分行95106999900835號帳戶',
-    '彰化區營業處核算（收費）課',
-    '(04)7256461',
-    '115年10月01日',
-    'PARSED'
-),
-(
-    '10-56-4770-02-1_211458_1.pdf',
-    '10-56-4770-02-1',
-    '10-PV-106-0047',
-    '賴侯淑貞',
-    '中租迪和股份有限公司',
-    '114 台北市內湖區瑞光路362號8樓至12樓',
-    '05072925',
-    '115年10月',
-    '2026-10',
-    '115年09月04日~115年10月05日',
-    '2026-09-04',
-    '2026-10-05',
-    '台南市安南區公學路五段656巷198號',
-    '台南市',
-    '安南區',
-    196.62,
-    196.62,
-    28062,
-    4.8111,
-    135009,
-    6750,
-    141759,
-    -249,
-    141510,
-    '永豐商業銀行營業部99717300000067號帳戶',
-    '台南區營業處核算（收費）課',
-    '(06)2160121',
-    '115年10月06日',
-    'PARSED'
-)
-ON CONFLICT (filename) DO UPDATE SET 
-    site_name = excluded.site_name,
-    net_payable_amount = excluded.net_payable_amount,
-    total_kwh = excluded.total_kwh;
+alter table public.electricity_bills add column if not exists consumption_kwh numeric;

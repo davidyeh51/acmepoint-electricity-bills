@@ -12,6 +12,7 @@ from starlette.requests import Request
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 
+from .access import BillAccessMiddleware
 from .config import BILLS_DIR, DB_PATH, DEFAULT_HOST, DEFAULT_PORT
 from .database import (
     init_db, list_bills, get_bill_by_id, delete_bill,
@@ -144,7 +145,9 @@ async def api_upload(request: Request):
                 "customer_name": parsed.get("customer_name"),
                 "bill_year_month": parsed.get("bill_year_month"),
                 "net_payable_amount": parsed.get("net_payable_amount"),
-                "total_kwh": parsed.get("total_kwh")
+                "total_kwh": parsed.get("total_kwh"),
+                "status": parsed.get("status"),
+                "parse_warnings": parsed.get("parse_warnings", [])
             })
         except Exception as e:
             errors.append(f"{filename} 處理失敗: {str(e)}")
@@ -241,7 +244,14 @@ async def api_import_dispatch(request: Request):
 from starlette.routing import Route, Mount
 from starlette.staticfiles import StaticFiles
 
+async def client_script(request):
+    name = request.path_params['name'] + '.js'
+    if name not in {'supabase-client.js','auth.js','bill-recognition.js'}:
+        return Response(status_code=404)
+    return FileResponse(ROOT_HTML.parent / name, media_type='application/javascript')
+
 routes = [
+    Route('/{name}.js', endpoint=client_script, methods=['GET']),
     Route("/", endpoint=index_view, methods=["GET"]),
     Route("/api/bills", endpoint=api_list_bills, methods=["GET"]),
     Route("/api/bills/{bill_id:int}", endpoint=api_get_bill, methods=["GET"]),
@@ -263,6 +273,7 @@ init_db()
 app = Starlette(
     routes=routes,
     middleware=[
+        Middleware(BillAccessMiddleware),
         Middleware(
             CORSMiddleware,
             allow_origins=["*"],
