@@ -1,6 +1,6 @@
 /**
  * 進金生能源 6692 - 全量稽核電費單標準資料庫 (Audited Bills Registry)
- * 供前端離線預載、秒級比對與 100% 零誤差辨識還原
+ * 供前端離線預載、秒級比對與 100% 零誤差辨識還原 (共 18 份已稽核電費單)
  */
 (function(root) {
   'use strict';
@@ -520,6 +520,270 @@
     "parse_warnings": [],
     "file_hash": "cb9a995f61e2876c45622a4a8c3fde1d80468ef07c2795f866b854bd333038a3",
     "file_size": 463277
+  },
+  {
+    "id": 13,
+    "filename": "04-22-8469-91-3_214426_1.pdf",
+    "electric_number": "04-22-8469-91-3",
+    "contract_number": "04-PV-109-0041",
+    "site_name": "桃園蘆竹南工路一場",
+    "customer_name": "中租迪和股份有限公司",
+    "customer_address": "台北市內湖區瑞光路362號8~12樓",
+    "tax_id": "05072925",
+    "bill_year_month": "115年11月",
+    "bill_year_month_ad": "2026-11",
+    "billing_period": "115年10月01日~115年10月31日",
+    "billing_start_ad": "2026-10-01",
+    "billing_end_ad": "2026-10-31",
+    "plant_location": "桃園市蘆竹區南工路41號（屋頂）一場",
+    "city": "桃園市",
+    "district": "蘆竹區",
+    "installed_capacity_kw": 1943.5,
+    "grid_capacity_kw": 1943.5,
+    "total_kwh": 191598,
+    "fit_rate": 5.0921,
+    "purchase_amount": 975641,
+    "tax_amount": 48782,
+    "total_bill_amount": 1024423,
+    "meter_rental_amount": -996,
+    "net_payable_amount": 1023427,
+    "machines_json": [
+      {
+        "name": "機組1",
+        "rate": 5.163,
+        "kwh": 47900,
+        "amount": 247308
+      },
+      {
+        "name": "機組2",
+        "rate": 5.0685,
+        "kwh": 47900,
+        "amount": 242781
+      },
+      {
+        "name": "機組3",
+        "rate": 5.0685,
+        "kwh": 47900,
+        "amount": 242781
+      },
+      {
+        "name": "機組4",
+        "rate": 5.0685,
+        "kwh": 47898,
+        "amount": 242771
+      }
+    ],
+    "status": "PARSED",
+    "bill_type": "FIT",
+    "parse_warnings": [],
+    "file_hash": "a8f62a371a925b150b504001a57aa714dba09e6eabc987d8b99040d36333838e",
+    "file_size": 496471
+  },
+  {
+    "id": 14,
+    "filename": "10-57-1231-91-1_214315_1.pdf",
+    "electric_number": "10-57-1231-91-1",
+    "contract_number": "10-PV-112-0238",
+    "site_name": "台南安南工業六路",
+    "customer_name": "中租迪和股份有限公司",
+    "customer_address": "台北市內湖區瑞光路362號6樓",
+    "tax_id": "05072925",
+    "bill_year_month": "115年11月",
+    "bill_year_month_ad": "2026-11",
+    "billing_period": "115年10月01日~115年10月31日",
+    "billing_start_ad": "2026-10-01",
+    "billing_end_ad": "2026-10-31",
+    "plant_location": "台南市安南區工業六路55號",
+    "city": "台南市",
+    "district": "安南區",
+    "installed_capacity_kw": 771.75,
+    "grid_capacity_kw": 771.75,
+    "total_kwh": 99039,
+    "fit_rate": 4.3153,
+    "purchase_amount": 427383,
+    "tax_amount": 21369,
+    "total_bill_amount": 448752,
+    "meter_rental_amount": -1628,
+    "net_payable_amount": 447124,
+    "machines_json": [
+      {
+        "name": "機組1",
+        "rate": 4.3153,
+        "kwh": 99039,
+        "amount": 427383
+      }
+    ],
+    "status": "PARSED",
+    "bill_type": "FIT",
+    "parse_warnings": [],
+    "file_hash": "0e22819a3bceb90578bcaf4a8b3c7923dab01d50fa251bf299631f47c7b9de64",
+    "file_size": 472573
+  },
+  {
+    "id": 15,
+    "filename": "11-24-4010-95-5_214726_1.pdf",
+    "electric_number": "11-24-4010-95-5",
+    "contract_number": "11-PV-105-0227",
+    "site_name": "高雄前鎮大華一路",
+    "customer_name": "中租迪和股份有限公司",
+    "customer_address": "台北市內湖區瑞光路362號8樓至12樓",
+    "tax_id": "05072925",
+    "bill_year_month": "115年11月",
+    "bill_year_month_ad": "2026-11",
+    "billing_period": "115年10月01日~115年10月31日",
+    "billing_start_ad": "2026-10-01",
+    "billing_end_ad": "2026-10-31",
+    "plant_location": "高雄市前鎮區大華一路38號",
+    "city": "高雄市",
+    "district": "前鎮區",
+    "installed_capacity_kw": 438.36,
+    "grid_capacity_kw": 438.36,
+    "total_kwh": 51194,
+    "fit_rate": 4.8056,
+    "purchase_amount": 246018,
+    "tax_amount": 12301,
+    "total_bill_amount": 258319,
+    "meter_rental_amount": -1541,
+    "net_payable_amount": 256778,
+    "machines_json": [
+      {
+        "name": "機組1",
+        "rate": 4.8056,
+        "kwh": 51194,
+        "amount": 246018
+      }
+    ],
+    "status": "PARSED",
+    "bill_type": "FIT",
+    "parse_warnings": [],
+    "file_hash": "873679b1736b98d71ad3125ebe6d518ba94200da86b64312199363fba942eb97",
+    "file_size": 475429
+  },
+  {
+    "id": 16,
+    "filename": "11-63-0824-95-9_214657_1.pdf",
+    "electric_number": "11-63-0824-95-9",
+    "contract_number": "11-PV-111-0233",
+    "site_name": "五甲尾",
+    "customer_name": "中租電力科技股份有限公司",
+    "customer_address": "台北市內湖區瑞光路362號8樓至12樓",
+    "tax_id": "43941328",
+    "bill_year_month": "115年11月",
+    "bill_year_month_ad": "2026-11",
+    "billing_period": "115年10月01日~115年10月31日",
+    "billing_start_ad": "2026-10-01",
+    "billing_end_ad": "2026-10-31",
+    "plant_location": "高雄市岡山區嘉興段344、344-2等 (五甲尾滯洪池)",
+    "city": "高雄市",
+    "district": "岡山區",
+    "installed_capacity_kw": 4999.2,
+    "grid_capacity_kw": 4999.2,
+    "total_kwh": 568635,
+    "fit_rate": 4.8529,
+    "purchase_amount": 2759529,
+    "tax_amount": 137976,
+    "total_bill_amount": 2897505,
+    "meter_rental_amount": -983,
+    "net_payable_amount": 2896522,
+    "machines_json": [
+      {
+        "name": "機組1",
+        "rate": 4.8529,
+        "kwh": 568635,
+        "amount": 2759529
+      }
+    ],
+    "status": "PARSED",
+    "bill_type": "FIT",
+    "parse_warnings": [],
+    "file_hash": "afedf12ec2c91d768df350ab484dd0c727d388ed923d9fe6107c303b645120ba",
+    "file_size": 501918
+  },
+  {
+    "id": 17,
+    "filename": "18-35-9151-58-2_214307_1.pdf",
+    "electric_number": "18-35-9151-58-2",
+    "contract_number": "18-PV-109-0042",
+    "site_name": "高雄大寮磚子磘段",
+    "customer_name": "中租迪和股份有限公司",
+    "customer_address": "台北市內湖區瑞光路362號8樓",
+    "tax_id": "05072925",
+    "bill_year_month": "115年11月",
+    "bill_year_month_ad": "2026-11",
+    "billing_period": "115年10月01日~115年10月31日",
+    "billing_start_ad": "2026-10-01",
+    "billing_end_ad": "2026-10-31",
+    "plant_location": "高雄市大寮區磚子磘段3362-1、3363~3374地號",
+    "city": "高雄市",
+    "district": "大寮區",
+    "installed_capacity_kw": 693.0,
+    "grid_capacity_kw": 693.0,
+    "total_kwh": 62396,
+    "fit_rate": 4.6983,
+    "purchase_amount": 293155,
+    "tax_amount": 14658,
+    "total_bill_amount": 307813,
+    "meter_rental_amount": -1008,
+    "net_payable_amount": 306805,
+    "machines_json": [
+      {
+        "name": "機組1",
+        "rate": 4.6983,
+        "kwh": 44925,
+        "amount": 211071
+      },
+      {
+        "name": "機組2",
+        "rate": 4.6983,
+        "kwh": 17471,
+        "amount": 82084
+      }
+    ],
+    "status": "PARSED",
+    "bill_type": "FIT",
+    "parse_warnings": [],
+    "file_hash": "c4443acbccad94de597c461709338899337326a5892b2803192441dd387c2371",
+    "file_size": 485030
+  },
+  {
+    "id": 18,
+    "filename": "18-44-1100-22-1_214356_1.pdf",
+    "electric_number": "18-44-1100-22-1",
+    "contract_number": "18-PV-109-0447",
+    "site_name": "高雄小港同利路",
+    "customer_name": "中租迪和股份有限公司",
+    "customer_address": "台北市內湖區瑞光路362號8樓",
+    "tax_id": "05072925",
+    "bill_year_month": "115年11月",
+    "bill_year_month_ad": "2026-11",
+    "billing_period": "115年10月01日~115年10月31日",
+    "billing_start_ad": "2026-10-01",
+    "billing_end_ad": "2026-10-31",
+    "plant_location": "高雄市小港區同利路20號",
+    "city": "高雄市",
+    "district": "小港區",
+    "installed_capacity_kw": 744.25,
+    "grid_capacity_kw": 744.25,
+    "total_kwh": 88197,
+    "fit_rate": 4.2968,
+    "purchase_amount": 378965,
+    "tax_amount": 18948,
+    "total_bill_amount": 397913,
+    "meter_rental_amount": -983,
+    "net_payable_amount": 396930,
+    "machines_json": [
+      {
+        "name": "機組1",
+        "rate": 4.2968,
+        "kwh": 88197,
+        "amount": 378965
+      }
+    ],
+    "status": "PARSED",
+    "bill_type": "FIT",
+    "parse_warnings": [],
+    "file_hash": "4399037ca0fac5a8e444ddf74c2faec3213ed0a59e21b5f8e620a0c00c16b927",
+    "file_size": 473784
   }
 ];
   root.AUDITED_BILLS_REGISTRY = REGISTRY;

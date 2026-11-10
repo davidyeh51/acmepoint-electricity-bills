@@ -10,7 +10,9 @@ const GLOBAL_KNOWN_PLANTS = {
   '20-74-4843-02-2': { site_name: '台南下營茅港尾', customer_name: '中租迪和股份有限公司', contract_number: '20-PV-108-0186', tax_id: '05072925', plant_location: '台南市下營區茅港里茅港尾227-5號', city: '台南市', district: '下營區', installed_capacity_kw: 300.08, fit_rate: 4.4896, taipower_branch: '新營區營業處' },
   '11-63-0824-95-9': { site_name: '五甲尾', customer_name: '常利太陽能股份有限公司', contract_number: '11-PV-111-0233', tax_id: '43941328', plant_location: '高雄市岡山區嘉興段344、344-2等 (五甲尾滯洪池)', city: '高雄市', district: '岡山區', installed_capacity_kw: 4999.20, fit_rate: 4.8529, taipower_branch: '高雄區營業處' },
   '08-40-8620-12-7': { site_name: '美傢家具鹿港廠1', customer_name: '常利太陽能股份有限公司', contract_number: '08-PV-109-0339', tax_id: '23924765', plant_location: '彰化縣鹿港鎮彰濱工業區鹿工路6號', city: '彰化縣', district: '鹿港鎮', installed_capacity_kw: 1628.90, fit_rate: 4.2444, taipower_branch: '彰化區營業處' },
-  '10-56-4770-02-1': { site_name: '賴侯淑貞', customer_name: '賴侯淑貞', contract_number: '10-PV-106-0047', tax_id: 'Q200880199', plant_location: '彰化縣大城鄉頂莊段0453-0000地號', city: '彰化縣', district: '大城鄉', installed_capacity_kw: 196.62, fit_rate: 4.2444, taipower_branch: '彰化區營業處' }
+  '10-56-4770-02-1': { site_name: '賴侯淑貞', customer_name: '賴侯淑貞', contract_number: '10-PV-106-0047', tax_id: 'Q200880199', plant_location: '彰化縣大城鄉頂莊段0453-0000地號', city: '彰化縣', district: '大城鄉', installed_capacity_kw: 196.62, fit_rate: 4.2444, taipower_branch: '彰化區營業處' },
+  '10-57-1231-91-1': { site_name: '台南安南工業六路', customer_name: '中租迪和股份有限公司', contract_number: '10-PV-112-0238', tax_id: '05072925', plant_location: '台南市安南區工業六路55號', city: '台南市', district: '安南區', installed_capacity_kw: 771.75, fit_rate: 4.3153, taipower_branch: '台南區營業處' },
+  '11-24-4010-95-5': { site_name: '高雄前鎮大華一路', customer_name: '中租迪和股份有限公司', contract_number: '11-PV-105-0227', tax_id: '05072925', plant_location: '高雄市前鎮區大華一路38號', city: '高雄市', district: '前鎮區', installed_capacity_kw: 438.36, fit_rate: 4.8056, taipower_branch: '高雄區營業處' },
 };
 
 function getKnownPlant(electricNumber) {
