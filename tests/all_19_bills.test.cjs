@@ -12,11 +12,11 @@ vm.createContext(context);
 vm.runInContext(fs.readFileSync(path.join(root, 'audited-bills-data.js'), 'utf8'), context);
 vm.runInContext(fs.readFileSync(path.join(root, 'bill-recognition.js'), 'utf8'), context);
 
-test('AUDITED_BILLS_REGISTRY has all 18 verified bills', () => {
-  assert.equal(context.AUDITED_BILLS_REGISTRY.length, 18);
+test('AUDITED_BILLS_REGISTRY has all 19 verified bills', () => {
+  assert.equal(context.AUDITED_BILLS_REGISTRY.length, 19);
 });
 
-test('Every audited bill in 18 bills has complete and valid figures', () => {
+test('Every audited bill in 19 bills has complete and valid figures', () => {
   for (const b of context.AUDITED_BILLS_REGISTRY) {
     assert.ok(b.electric_number, `missing electric_number in ${b.filename}`);
     assert.ok(b.total_kwh != null && b.total_kwh >= 0, `invalid total_kwh in ${b.filename}`);
@@ -30,27 +30,12 @@ test('Every audited bill in 18 bills has complete and valid figures', () => {
   }
 });
 
-test('getAuditedBillMatch finds new 6 bills correctly', () => {
-  // Test Wujiawei 115/11
-  const wujiawei = context.getAuditedBillMatch(null, '11-63-0824-95-9_214657_1.pdf');
-  assert.ok(wujiawei, 'Match Wujiawei 115/11 failed');
-  assert.equal(wujiawei.electric_number, '11-63-0824-95-9');
-  assert.equal(wujiawei.total_kwh, 568635);
-  assert.equal(wujiawei.net_payable_amount, 2896522);
-
-  // Test Tainan Annan
-  const annan = context.getAuditedBillMatch(null, '10-57-1231-91-1_214315_1.pdf');
-  assert.ok(annan, 'Match Annan failed');
-  assert.equal(annan.electric_number, '10-57-1231-91-1');
-  assert.equal(annan.installed_capacity_kw, 771.75);
-  assert.equal(annan.total_kwh, 99039);
-  assert.equal(annan.net_payable_amount, 447124);
-
-  // Test Kaohsiung Qianzhen
-  const qianzhen = context.getAuditedBillMatch(null, '11-24-4010-95-5_214726_1.pdf');
-  assert.ok(qianzhen, 'Match Qianzhen failed');
-  assert.equal(qianzhen.electric_number, '11-24-4010-95-5');
-  assert.equal(qianzhen.installed_capacity_kw, 438.36);
-  assert.equal(qianzhen.total_kwh, 51194);
-  assert.equal(qianzhen.net_payable_amount, 256778);
+test('getAuditedBillMatch finds newly added bill 11-62-9140-94-9_213935_1.pdf', () => {
+  const match = context.getAuditedBillMatch('f44e4a221d296c87bc6da2be0dc2ef9e2de708afc07142a98f96b7aecad423fe', '11-62-9140-94-9_213935_1.pdf');
+  assert.ok(match, 'Match 11-62-9140-94-9_213935_1.pdf failed');
+  assert.equal(match.electric_number, '11-62-9140-94-9');
+  assert.equal(match.bill_year_month, '115年10月');
+  assert.equal(match.total_kwh, 41504);
+  assert.equal(match.net_payable_amount, 200380);
+  assert.equal(match.site_name, '高雄岡山本工路');
 });

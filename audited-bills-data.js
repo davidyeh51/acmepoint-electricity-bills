@@ -1,6 +1,6 @@
 /**
  * 進金生能源 6692 - 全量稽核電費單標準資料庫 (Audited Bills Registry)
- * 供前端離線預載、秒級比對與 100% 零誤差辨識還原 (共 18 份已稽核電費單)
+ * 供前端離線預載、秒級比對與 100% 零誤差辨識還原 (共 19 份已稽核電費單)
  */
 (function(root) {
   'use strict';
@@ -784,6 +784,52 @@
     "parse_warnings": [],
     "file_hash": "4399037ca0fac5a8e444ddf74c2faec3213ed0a59e21b5f8e620a0c00c16b927",
     "file_size": 473784
+  },
+  {
+    "id": 19,
+    "filename": "11-62-9140-94-9_213935_1.pdf",
+    "file_hash": "f44e4a221d296c87bc6da2be0dc2ef9e2de708afc07142a98f96b7aecad423fe",
+    "file_size": 477353,
+    "electric_number": "11-62-9140-94-9",
+    "contract_number": "11-PV-105-0005",
+    "site_name": "高雄岡山本工路",
+    "customer_name": "中租迪和股份有限公司",
+    "customer_address": "台北市內湖區瑞光路362號8-12樓",
+    "tax_id": "05072925",
+    "bill_year_month": "115年10月",
+    "bill_year_month_ad": "2026-10",
+    "billing_period": "115年09月03日~115年10月04日",
+    "billing_start_ad": "2026-09-03",
+    "billing_end_ad": "2026-10-04",
+    "plant_location": "高雄市岡山區本工路56號",
+    "city": "高雄市",
+    "district": "岡山區",
+    "installed_capacity_kw": 336.84,
+    "grid_capacity_kw": 336.84,
+    "total_kwh": 41504,
+    "fit_rate": 4.6039,
+    "purchase_amount": 191079,
+    "tax_amount": 9554,
+    "total_bill_amount": 200633,
+    "meter_rental_amount": -253,
+    "net_payable_amount": 200380,
+    "machines_json": [
+      {
+        "name": "機組1",
+        "rate": 4.5388,
+        "kwh": 20361,
+        "amount": 92415
+      },
+      {
+        "name": "機組2",
+        "rate": 4.6665,
+        "kwh": 21143,
+        "amount": 98664
+      }
+    ],
+    "status": "PARSED",
+    "bill_type": "FIT",
+    "parse_warnings": []
   }
 ];
   root.AUDITED_BILLS_REGISTRY = REGISTRY;
