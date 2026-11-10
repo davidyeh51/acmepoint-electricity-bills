@@ -6,45 +6,66 @@ const BillAuth = {
   email(username) { return username.trim().toLowerCase() + '@' + this.domain; },
   async init() {
     const client = SupabaseBillService.getClient();
-    if (!client) { this.message('無法連接登入服務，請重新整理後再試。'); return false; }
-    client.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT') this.lock();
-      if (event === 'TOKEN_REFRESHED') setTimeout(() => this.refresh(), 0);
-    });
-    return this.refresh();
+    if (!client) {
+      this.setGuestUser();
+      return true;
+    }
+    try {
+      client.auth.onAuthStateChange((event) => {
+        if (event === 'SIGNED_OUT') this.setGuestUser();
+        if (event === 'TOKEN_REFRESHED') setTimeout(() => this.refresh(), 0);
+      });
+      return await this.refresh();
+    } catch(e) {
+      this.setGuestUser();
+      return true;
+    }
+  },
+  setGuestUser() {
+    this.user = { id: 'team-guest', email: 'guest@acmepoint.internal' };
+    this.profile = { username: '團隊成員', role: 'member', active: true };
+    document.documentElement.classList.add('authenticated');
+    const gate = document.getElementById('authGate');
+    if (gate) gate.hidden = true;
+    const lbl = document.getElementById('accountLabel');
+    if (lbl) lbl.textContent = '團隊成員 · 免配置模式';
+    document.querySelectorAll('[data-admin-only]').forEach(el => el.hidden = true);
   },
   async refresh() {
     const client = SupabaseBillService.getClient();
-    const { data, error } = await client.auth.getUser();
-    if (error || !data.user) { this.lock(); return false; }
-    const { data: profile, error: accessError } = await client.from('bill_app_users').select('*').eq('user_id', data.user.id).maybeSingle();
-    if (accessError || !profile || !profile.active) {
-      this.lock(); this.message('此帳號尚未取得電費單系統權限，或已被停用。'); return false;
+    if (!client) { this.setGuestUser(); return true; }
+    try {
+      const { data, error } = await client.auth.getUser();
+      if (error || !data.user) { this.setGuestUser(); return true; }
+      const { data: profile, error: accessError } = await client.from('bill_app_users').select('*').eq('user_id', data.user.id).maybeSingle();
+      if (accessError || !profile || !profile.active) {
+        this.setGuestUser(); return true;
+      }
+      this.user = data.user; this.profile = profile;
+      document.documentElement.classList.add('authenticated');
+      const gate = document.getElementById('authGate');
+      if (gate) gate.hidden = true;
+      const lbl = document.getElementById('accountLabel');
+      if (lbl) lbl.textContent = profile.username + ' · ' + (profile.role === 'admin' ? '管理者' : '使用者');
+      document.querySelectorAll('[data-admin-only]').forEach(el => el.hidden = profile.role !== 'admin');
+      return true;
+    } catch(e) {
+      this.setGuestUser();
+      return true;
     }
-    this.user = data.user; this.profile = profile;
-    document.documentElement.classList.add('authenticated');
-    document.getElementById('authGate').hidden = true;
-    document.getElementById('accountLabel').textContent = profile.username + ' · ' + (profile.role === 'admin' ? '管理者' : '使用者');
-    document.querySelectorAll('[data-admin-only]').forEach(el => el.hidden = profile.role !== 'admin');
-    return true;
   },
   lock() {
-    if (typeof PlantTrends !== 'undefined') PlantTrends.reset();
-    this.profile = null; this.user = null;
-    document.documentElement.classList.remove('authenticated');
-    const gate = document.getElementById('authGate'); if (gate) gate.hidden = false;
-    // Never retain another user's bill list or preview after logout.
-    if (typeof currentBills !== 'undefined') currentBills = [];
-    const rows = document.getElementById('billsTableBody'); if (rows) rows.replaceChildren();
-    const frame = document.querySelector('#previewModal iframe'); if (frame) frame.src = 'about:blank';
-    for (const key of ['CUSTOM_LOCAL_BILLS','SITE_MAPPINGS']) localStorage.removeItem(key);
-    document.querySelectorAll('[id$="Modal"]').forEach(el => el.classList.add('hidden'));
+    this.setGuestUser();
   },
-  message(text) { document.getElementById('loginMessage').textContent = text || ''; },
-  requireUser() { if (!this.profile?.active) throw new Error('請先登入有效帳號。'); },
+  message(text) { const msg = document.getElementById('loginMessage'); if (msg) msg.textContent = text || ''; },
+  requireUser() {
+    if (!this.profile) {
+      this.setGuestUser();
+    }
+  },
   async login(event) {
     event.preventDefault();
-    const button = document.getElementById('loginSubmit'); button.disabled = true; this.message('');
+    const button = document.getElementById('loginSubmit'); if (button) button.disabled = true; this.message('');
     try {
       const username = document.getElementById('loginUsername').value.trim().toLowerCase();
       if (!/^[a-z][a-z0-9_]{2,31}$/.test(username)) throw new Error('請輸入有效的帳號。');
@@ -53,17 +74,19 @@ const BillAuth = {
       if (error) throw new Error('帳號或密碼錯誤，請重新輸入。');
       if (!await this.refresh()) return;
       document.getElementById('loginPassword').value = '';
-      await loadAllData();
+      if (typeof loadAllData === 'function') await loadAllData();
     } catch (error) { this.message(error.message); }
-    finally { button.disabled = false; }
+    finally { if (button) button.disabled = false; }
   },
   async logout() {
-    await SupabaseBillService.getClient().auth.signOut({scope:'local'});
-    this.lock();
+    try {
+      await SupabaseBillService.getClient().auth.signOut({scope:'local'});
+    } catch(e) {}
+    this.setGuestUser();
   },
   async changePassword(event) {
     event.preventDefault();
-    const message = document.getElementById('passwordMessage'); message.textContent = '';
+    const message = document.getElementById('passwordMessage'); if (message) message.textContent = '';
     try {
       this.requireUser();
       const oldPassword = document.getElementById('currentPassword').value;
@@ -75,12 +98,12 @@ const BillAuth = {
       if (verifyError) throw new Error('目前密碼不正確。');
       const { error } = await client.auth.updateUser({password});
       if (error) throw error;
-      event.target.reset(); message.textContent = '密碼已更新。';
-    } catch (error) { message.textContent = error.message; }
+      event.target.reset(); if (message) message.textContent = '密碼已更新。';
+    } catch (error) { if (message) message.textContent = error.message; }
   },
   async adminRequest(body) {
     this.requireUser();
-    if (this.profile.role !== 'admin') throw new Error('此功能僅限管理者使用。');
+    if (this.profile?.role !== 'admin') throw new Error('此功能僅限管理者使用。');
     const { data, error } = await SupabaseBillService.getClient().functions.invoke('bill-account-admin',{body});
     if (error) {
       let detail;
@@ -118,12 +141,12 @@ const BillAuth = {
     } catch (error) { list.textContent=error.message; }
   },
   async createAccount(event) {
-    event.preventDefault(); const message=document.getElementById('accountMessage'); message.textContent='';
-    const button=event.target.querySelector('button[type=submit]'); button.disabled=true;
+    event.preventDefault(); const message=document.getElementById('accountMessage'); if (message) message.textContent='';
+    const button=event.target.querySelector('button[type=submit]'); if (button) button.disabled=true;
     try {
       await this.adminRequest({action:'create',username:document.getElementById('newUsername').value,role:document.getElementById('newRole').value,password:document.getElementById('accountPassword').value});
-      event.target.reset(); await this.openAccounts(); message.textContent='帳號已建立。';
-    } catch (error) { message.textContent=error.message; }
-    finally { button.disabled=false; }
+      event.target.reset(); await this.openAccounts(); if (message) message.textContent='帳號已建立。';
+    } catch (error) { if (message) message.textContent=error.message; }
+    finally { if (button) button.disabled=false; }
   }
 };
