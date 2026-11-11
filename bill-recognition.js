@@ -14,6 +14,7 @@ const GLOBAL_KNOWN_PLANTS = {
   '10-57-1231-91-1': { site_name: '台南安南工業六路', customer_name: '中租迪和股份有限公司', contract_number: '10-PV-112-0238', tax_id: '05072925', plant_location: '台南市安南區工業六路55號', city: '台南市', district: '安南區', installed_capacity_kw: 771.75, fit_rate: 4.3153, taipower_branch: '台南區營業處' },
   '11-24-4010-95-5': { site_name: '高雄前鎮大華一路', customer_name: '中租迪和股份有限公司', contract_number: '11-PV-105-0227', tax_id: '05072925', plant_location: '高雄市前鎮區大華一路38號', city: '高雄市', district: '前鎮區', installed_capacity_kw: 438.36, fit_rate: 4.8056, taipower_branch: '高雄區營業處' },
   '21-60-1433-90-2': { site_name: '苗栗銅鑼民治路', customer_name: '中租迪和股份有限公司', contract_number: '21-PV-109-0033', tax_id: '05072925', plant_location: '苗栗縣銅鑼鄉民治路39號', city: '苗栗縣', district: '銅鑼鄉', installed_capacity_kw: 646.695, fit_rate: 5.1415, taipower_branch: '苗栗區營業處' },
+  '11-71-0067-91-9': { site_name: 'CCK001 高振實業', customer_name: '建坤能源股份有限公司', contract_number: '11-PV-115-0133', tax_id: '96830692', plant_location: '高雄市湖內區民生街121、123、125、125-1、125-2、125-3、127、129、129-1、129-2號', city: '高雄市', district: '湖內區', installed_capacity_kw: 1358.14, fit_rate: 3.729, taipower_branch: '高雄區營業處覈算(收費)課' },
 };
 
 function getKnownPlant(electricNumber) {
@@ -215,14 +216,30 @@ function parseTaipowerBillFromText(rawText, rawLines, filename) {
   bill.customer_name='';bill.customer_address='';
   for(let i=0;i<lines.length;i++){
     if(/先生\s*[/、]\s*女士|寶號/.test(lines[i])){
-      bill.customer_name=lines[i].split(/先生|女士|寶號/)[0].trim()||(i?lines[i-1]:'');
+      const prefix=lines[i].split(/先生|女士|寶號/)[0].trim();
+      const prev1=i?lines[i-1]:'';
+      const prev2=i>1?lines[i-2]:'';
+      if(prefix){
+        bill.customer_name=prefix;
+      }else if(prev2 && /[\u4e00-\u9fff]{2,15}(?:股份)?有限公司/.test(prev2) && !prev2.includes('台灣電力') && !/(?:公司|有限|行號|合作社|農會|銀行|學校)/.test(prev1)){
+        bill.customer_name=prev2;
+      }else{
+        bill.customer_name=prev1;
+      }
       for(let j=i-1;j>=Math.max(0,i-5);j--)if(/[縣市].*[路街段巷號樓]/.test(lines[j])&&!/公司|電力/.test(lines[j])){bill.customer_address=lines[j];break;}
       break;
     }
   }
   if(!bill.customer_name)bill.customer_name=(text.match(/[\u4e00-\u9fff]{2,15}(?:股份)?有限公司/g)||[]).find(x=>!x.includes('台灣電力'))||'';
   bill.tax_id=find(/統一編號\s*[:：]?\s*(\d{8})\b/);
-  bill.plant_location=find(/設(?:置|定)地點\s*[:：]?\s*([^\n]+)/);
+  const locMatch=text.match(/設(?:置|定)地點\s*[:：]?\s*([^\n]+)(?:\n([^\n]+))?/);
+  bill.plant_location=locMatch?locMatch[1].trim():'';
+  if(locMatch&&locMatch[2]){
+    const cont=locMatch[2].trim();
+    if((/[、,，\-之]$/.test(bill.plant_location)||/^\d+(?:[-之]\d+)?[、,]/.test(cont))&&!/發票|統一|載具|服務/.test(cont)){
+      bill.plant_location+=cont;
+    }
+  }
   const city=bill.plant_location.match(/(?:台北|新北|桃園|台中|台南|高雄|基隆|新竹|嘉義)市|(?:新竹|苗栗|彰化|南投|雲林|嘉義|屏東|宜蘭|花蓮|台東|澎湖|金門|連江)縣/);
   bill.city=city?city[0]:'';
   const district=bill.city?bill.plant_location.match(new RegExp(bill.city+'([^\\d縣市、]{1,5}?[區鄉鎮市])')):null;bill.district=district?district[1]:'';
@@ -235,16 +252,26 @@ function parseTaipowerBillFromText(rawText, rawLines, filename) {
   const rent=number('本期電表租費');bill.meter_rental_amount=rent==null?null:-Math.abs(rent);
   
   const machines=[];
-  for(const m of text.matchAll(/機組\s*0?(\d+)\s+([0-9]+(?:\.[0-9]{1,6})?)\s+([\d,]+)\s+([\d,]+)\s*元?/g)){
+  for(const m of text.matchAll(/機組\s*0?(\d+)\s+([0-9]+(?:\.[0-9]{1,6})?)\s+([\d,]+)\*?\s+([\d,]+)\s*元?/g)){
     const rate=Number(m[2]),kwh=Number(m[3].replace(/,/g,'')),amount=Number(m[4].replace(/,/g,''));
     if(rate>0&&rate<20&&Math.abs(rate*kwh-amount)<=Math.max(3,amount*0.002)&&!machines.some(x=>x.name==='機組'+Number(m[1])&&x.kwh===kwh&&x.amount===amount))machines.push({name:'機組'+Number(m[1]),rate,kwh,amount});
+  }
+  const settM=text.split('發票資訊')[0].match(/(?:併聯)?試運轉(?:差額)?結算(?:\s+[0-9]+\.[0-9]+\s+[\d,]+\*?)?\s*[:：]?\s*([\d,]+(?:\.\d+)?)(?![\d,.\-])/);
+  const settlementAmt=settM?Number(settM[1].replace(/,/g,'')):null;
+  if(settlementAmt && settlementAmt>0 && bill.purchase_amount!=null && !machines.some(x=>x.name==='併聯試運轉結算')){
+    machines.push({name:'併聯試運轉結算',rate:0,kwh:0,amount:settlementAmt});
+    if(bill.tax_amount!=null&&((bill.total_bill_amount!=null&&Math.abs(bill.purchase_amount+settlementAmt+bill.tax_amount-bill.total_bill_amount)<=2)||(bill.net_payable_amount!=null&&rent!=null&&Math.abs(bill.purchase_amount+settlementAmt+bill.tax_amount-Math.abs(rent)-bill.net_payable_amount)<=2))){
+      bill.purchase_amount=bill.purchase_amount+settlementAmt;
+    }
   }
   bill.machines=machines;bill.machines_json=machines;
   const formula=text.match(/[=＝]\s*([\d,]+)\s*度/);
   bill.total_kwh=formula?Number(formula[1].replace(/,/g,'')):(machines.length?machines.reduce((s,m)=>s+m.kwh,0):null);
   if(bill.purchase_amount==null&&machines.length)bill.purchase_amount=machines.reduce((s,m)=>s+m.amount,0);
-  const machineKwh=machines.reduce((s,m)=>s+m.kwh,0);
-  bill.fit_rate=machines.length?(machineKwh?Number((machines.reduce((s,m)=>s+m.amount,0)/machineKwh).toFixed(4)):machines[0].rate):number('費率');
+  const energyMachines=machines.filter(m=>m.kwh>0||m.name.startsWith('機組'));
+  const machineKwh=energyMachines.reduce((s,m)=>s+m.kwh,0);
+  const machineEnergyAmount=energyMachines.reduce((s,m)=>s+m.amount,0);
+  bill.fit_rate=energyMachines.length?(machineKwh?Number((machineEnergyAmount/machineKwh).toFixed(4)):energyMachines[0].rate):number('費率');
   const machineAmount=machines.reduce((s,m)=>s+m.amount,0);
   if(machines.length&&bill.tax_amount!=null&&bill.net_payable_amount!=null&&rent!=null&&Math.abs(machineAmount+bill.tax_amount-Math.abs(rent)-bill.net_payable_amount)<=2)bill.purchase_amount=machineAmount;
   if(bill.purchase_amount!=null&&bill.tax_amount!=null&&bill.net_payable_amount!=null&&rent!=null&&Math.abs(bill.purchase_amount+bill.tax_amount-Math.abs(rent)-bill.net_payable_amount)<=2)bill.total_bill_amount=bill.purchase_amount+bill.tax_amount;

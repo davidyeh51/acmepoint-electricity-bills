@@ -106,7 +106,14 @@ def parse_bill_text(raw_text,filename=""):
     for index,line in enumerate(lines):
         if re.search(r"先生\s*[/、]\s*女士|寶號",line):
             prefix=re.split(r"先生|女士|寶號",line)[0].strip()
-            data["customer_name"]=prefix or (lines[index-1] if index else "")
+            prev1=lines[index-1] if index else ""
+            prev2=lines[index-2] if index>1 else ""
+            if prefix:
+                data["customer_name"]=prefix
+            elif prev2 and re.search(r"[\u4e00-\u9fff]{2,15}(?:股份)?有限公司",prev2) and "台灣電力" not in prev2 and not re.search(r"公司|有限|行號|合作社|農會|銀行|學校",prev1):
+                data["customer_name"]=prev2
+            else:
+                data["customer_name"]=prev1
             for candidate in reversed(lines[max(0,index-5):index]):
                 if re.search(r"[縣市].*[路街段巷號樓]",candidate) and not re.search(r"公司|電力",candidate):
                     data["customer_address"]=candidate;break
@@ -115,7 +122,12 @@ def parse_bill_text(raw_text,filename=""):
         companies=re.findall(r"[\u4e00-\u9fff]{2,15}(?:股份)?有限公司",text)
         data["customer_name"]=next((c for c in companies if "台灣電力" not in c),"")
     data["tax_id"]=find(r"統一編號\s*[:：]?\s*(\d{8})\b")
-    data["plant_location"]=find(r"設置地點\s*[:：]?\s*([^\n]+)")
+    loc_m=re.search(r"設(?:置|定)地點\s*[:：]?\s*([^\n]+)(?:\n([^\n]+))?",text)
+    data["plant_location"]=loc_m[1].strip() if loc_m else ""
+    if loc_m and loc_m[2]:
+        cont=loc_m[2].strip()
+        if (re.search(r"[、,，\-之]$",data["plant_location"]) or re.match(r"^\d+(?:[-之]\d+)?[、,]",cont)) and not re.search(r"發票|統一|載具|服務",cont):
+            data["plant_location"]+=cont
     data["city"]=""
     data["district"]=""
     city=re.search(r"(?:台北|新北|桃園|台中|台南|高雄|基隆|新竹|嘉義)市|(?:新竹|苗栗|彰化|南投|雲林|嘉義|屏東|宜蘭|花蓮|台東|澎湖|金門|連江)縣",data["plant_location"])
@@ -135,22 +147,29 @@ def parse_bill_text(raw_text,filename=""):
     rent=amount("本期電表租費")
     data["meter_rental_amount"]=-abs(rent) if rent is not None else None
     machines=[]
-    pattern=r"機組\s*0?(\d+)\s+([0-9]+(?:\.[0-9]{1,6})?)\s+([\d,]+)\s+([\d,]+)\s*元?"
+    pattern=r"機組\s*0?(\d+)\s+([0-9]+(?:\.[0-9]{1,6})?)\s+([\d,]+)\*?\s+([\d,]+)\s*元?"
     for match in re.finditer(pattern,text):
         rate,kwh,money=map(clean_num,match.groups()[1:])
         if rate is not None and 0<rate<20 and kwh is not None and money is not None:
             if abs(rate*kwh-money)<=max(3,money*0.002):
                 item={"name":"機組"+str(int(match[1])),"rate":rate,"kwh":kwh,"amount":money}
                 if item not in machines:machines.append(item)
+    sett_m=re.search(r"(?:併聯)?試運轉(?:差額)?結算(?:\s+[0-9]+\.[0-9]+\s+[\d,]+\*?)?\s*[:：]?\s*"+NUM+r"(?![\d,.\-])",text.split("發票資訊",1)[0])
+    settlement=clean_num(sett_m[1]) if sett_m else None
+    if settlement and settlement>0 and data["purchase_amount"] is not None and not any(m["name"]=="併聯試運轉結算" for m in machines):
+        machines.append({"name":"併聯試運轉結算","rate":0,"kwh":0,"amount":settlement})
+        if data["tax_amount"] is not None and ((data["total_bill_amount"] is not None and abs(data["purchase_amount"]+settlement+data["tax_amount"]-data["total_bill_amount"])<=2) or (data["net_payable_amount"] is not None and rent is not None and abs(data["purchase_amount"]+settlement+data["tax_amount"]-abs(rent)-data["net_payable_amount"])<=2)):
+            data["purchase_amount"]=data["purchase_amount"]+settlement
     data["machines"]=machines
     data["machines_json"]=json.dumps(machines,ensure_ascii=False)
     formula=re.search(r"[=＝]\s*([\d,]+)\s*度",text)
     data["total_kwh"]=clean_num(formula[1]) if formula else (sum(m["kwh"] for m in machines) if machines else None)
     if machines and data["purchase_amount"] is None:data["purchase_amount"]=sum(m["amount"] for m in machines)
     data["fit_rate"]=None
-    if machines:
-        kwh_sum=sum(m["kwh"] for m in machines)
-        data["fit_rate"]=round(sum(m["amount"] for m in machines)/kwh_sum,4) if kwh_sum else machines[0]["rate"]
+    energy_machines=[m for m in machines if m["kwh"]>0 or m["name"].startswith("機組")]
+    if energy_machines:
+        kwh_sum=sum(m["kwh"] for m in energy_machines)
+        data["fit_rate"]=round(sum(m["amount"] for m in energy_machines)/kwh_sum,4) if kwh_sum else energy_machines[0]["rate"]
     if data["fit_rate"] is None:data["fit_rate"]=amount("費率")
     machine_amount=sum(m["amount"] for m in machines)
     if machines and data["tax_amount"] is not None and data["net_payable_amount"] is not None and rent is not None and abs(machine_amount+data["tax_amount"]-abs(rent)-data["net_payable_amount"])<=2:data["purchase_amount"]=machine_amount

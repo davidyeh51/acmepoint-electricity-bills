@@ -130,13 +130,14 @@ test('PlantTrends.load falls back cleanly on Supabase permission denied error', 
   const statusText = elements.get('trendStatus').textContent;
   assert.ok(!statusText.includes('資料讀取失敗'), `Unexpected error status: ${statusText}`);
   assert.ok(!statusText.includes('permission denied'), `Should not leak raw error: ${statusText}`);
-  assert.equal(context.PlantTrends.data.length, 21);
+  assert.equal(context.PlantTrends.data.length, 26);
 
   const options = elements.get('trendPlant').children;
   const expectedPlantCount = new Set(context.AUDITED_BILLS_REGISTRY.map(b => b.electric_number)).size;
   assert.equal(options.length, expectedPlantCount, 'All plants with audited bills should be populated in dropdown');
   assert.ok(options.some(o => o.value === '21-60-1433-90-2'), 'New Miaoli plant should appear in trendPlant selector');
   assert.ok(options.some(o => o.value === '08-40-8620-12-7'), 'Changhua Lukang plant should appear in trendPlant selector');
+  assert.ok(options.some(o => o.value === '11-71-0067-91-9'), 'CCK001 Gaozhen plant should appear in trendPlant selector');
   assert.equal(elements.get('trendExport').disabled, false);
 
   for (const opt of options) {

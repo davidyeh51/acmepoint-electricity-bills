@@ -47,13 +47,15 @@
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <!-- Supabase Client Module -->
     <!-- Audited Bills Standard Database Module -->
-    <script src="audited-bills-data.js?v=20261111.1"></script>
-    <script src="supabase-client.js?v=20261111.1"></script>
+    <script src="audited-bills-data.js?v=20261111.2"></script>
+    <script src="supabase-client.js?v=20261111.2"></script>
     <script src="auth.js?v=20261030.2"></script>
     <script src="trends-core.js?v=20261030.2"></script>
     <script src="plant-trends.js?v=20261111.1"></script>
     <link rel="stylesheet" href="trends.css?v=20261030.2">
-    <script src="bill-recognition.js?v=20261111.1"></script>
+    <script src="bill-recognition.js?v=20261111.2"></script>
+    <script src="spv-finance-data.js?v=20261111.1"></script>
+    <script src="spv-finance.js?v=20261111.1"></script>
     <style>
         [hidden] { display: none !important; }
         html:not(.authenticated) body > :not(#authGate):not(script):not(style) { display: none !important; }
@@ -180,6 +182,11 @@
                     <span class="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 rounded-full">Google Maps + 反推</span>
                 </button>
                 <button id="navTabTrends" onclick="switchMainView('trends')" class="inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-white text-slate-700 hover:bg-slate-50 border border-slate-200"><i data-lucide="chart-no-axes-combined" class="w-4 h-4 text-brand-600"></i><span>案場發電與收益趨勢</span></button>
+                <button id="navTabSpv" onclick="switchMainView('spv')" class="inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-white text-slate-700 hover:bg-slate-50 border border-slate-200">
+                    <i data-lucide="landmark" class="w-4 h-4 text-indigo-600"></i>
+                    <span>建坤 SPV 電廠財務追蹤</span>
+                    <span class="px-2 py-0.5 text-[10px] font-bold bg-indigo-100 text-indigo-800 rounded-full">CCK001 高振實業</span>
+                </button>
             </div>
             <div id="calculatorTopActions" class="hidden flex items-center space-x-2">
                 <button onclick="copyOmSummaryText()" class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition shadow-sm" title="複製 LINE/Email 請款通知摘要">
@@ -927,6 +934,9 @@
   <p class="trend-note">參考定義：<a href="https://www.pvsyst.com/help/project-design/results/normalised-performance-index.html" target="_blank" rel="noopener noreferrer">PVsyst 比發電量與單位</a>；<a href="https://pvpmc.sandia.gov/modeling-guide/5-ac-system-output/uncertainty-quantification/" target="_blank" rel="noopener noreferrer">Sandia 發電量不確定性</a>。帳單資料來自登入後可存取的電費單資料庫。</p>
  </details>
 </section>
+<div id="spvFinanceView" class="hidden space-y-6">
+    <div id="spvFinanceRoot" class="space-y-6"></div>
+</div>
     </main>
 
     <!-- Quick Google Map Modal (Triggered from Bills Table or Preview Modal) -->
@@ -1648,6 +1658,7 @@
         // Load Data (KPIs + Filters + Table)
         async function loadAllData() {
             if (typeof PlantTrends !== 'undefined') PlantTrends.invalidate();
+            if (typeof SpvFinance !== 'undefined') await SpvFinance.load(true);
             await fetchKPIs();
             await fetchFilterOptions();
             await renderBillsTable();
@@ -2261,6 +2272,21 @@
                 fit_rate: 5.1415,
                 taipower_branch: '苗栗區營業處'
             },
+            '11-71-0067-91-9': {
+                site_name: 'CCK001 高振實業',
+                customer_name: '建坤能源股份有限公司',
+                contract_number: '11-PV-115-0133',
+                tax_id: '96830692',
+                plant_location: '高雄市湖內區民生街121、123、125、125-1、125-2、125-3、127、129、129-1、129-2號',
+                city: '高雄市',
+                district: '湖內區',
+                lat: 22.8784,
+                lng: 120.2489,
+                map_query: '22.8784,120.2489',
+                installed_capacity_kw: 1358.14,
+                fit_rate: 3.729,
+                taipower_branch: '高雄區營業處覈算(收費)課'
+            },
         };
         window.KNOWN_PLANTS = KNOWN_PLANTS;
 
@@ -2683,9 +2709,11 @@
             const tabBills = document.getElementById('navTabBills');
             const tabCalc = document.getElementById('navTabCalculator');
             const tabMapYield = document.getElementById('navTabMapYield');
+            const tabSpv = document.getElementById('navTabSpv');
             const billsView = document.getElementById('billsView');
             const calcView = document.getElementById('calculatorView');
             const mapYieldView = document.getElementById('mapYieldView');
+            const spvView = document.getElementById('spvFinanceView');
             const topActions = document.getElementById('calculatorTopActions');
             const mapTopActions = document.getElementById('mapYieldTopActions');
 
@@ -2696,6 +2724,7 @@
             billsView.classList.add('hidden');
             calcView.classList.add('hidden');
             if (mapYieldView) mapYieldView.classList.add('hidden');
+            if (spvView) spvView.classList.add('hidden');
             topActions.classList.add('hidden');
             if (mapTopActions) mapTopActions.classList.add('hidden');
 
@@ -2703,6 +2732,7 @@
             tabBills.className = inactiveCls;
             tabCalc.className = inactiveCls;
             if (tabMapYield) tabMapYield.className = inactiveCls;
+            if (tabSpv) tabSpv.className = inactiveCls;
 
             if (view === 'trends') {
                 trendView.classList.remove('hidden');
@@ -2718,6 +2748,10 @@
                 if (tabMapYield) tabMapYield.className = activeCls;
                 if (mapTopActions) mapTopActions.classList.remove('hidden');
                 refreshMapAndYieldAnalytics();
+            } else if (view === 'spv') {
+                if (spvView) spvView.classList.remove('hidden');
+                if (tabSpv) tabSpv.className = activeCls;
+                if (typeof SpvFinance !== 'undefined') SpvFinance.load();
             } else {
                 billsView.classList.remove('hidden');
                 tabBills.className = activeCls;
