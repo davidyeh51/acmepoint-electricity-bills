@@ -507,7 +507,8 @@ const SupabaseBillService = {
           updated++;
         }
       }
-      for (let b of SEED_BILLS) {
+      const seedList = (typeof window !== 'undefined' && (window.AUDITED_BILLS_REGISTRY || window.DEFAULT_SEED_BILLS)) || [];
+      for (let b of seedList) {
         if (b.electric_number === r.electric_number || (r.filename && b.filename === r.filename)) {
           b.site_name = r.site_name;
           updated++;
@@ -516,7 +517,7 @@ const SupabaseBillService = {
     }
     localStorage.setItem('CUSTOM_LOCAL_BILLS', JSON.stringify(customList));
 
-    if (!this.isConfigured()) {
+    if (!this.isConfigured() || !supabaseInstance) {
       return { 
         success: true, 
         count: records.length, 
@@ -524,26 +525,32 @@ const SupabaseBillService = {
       };
     }
 
-    // 更新 Supabase 雲端資料庫
+    // 更新 Supabase 雲端資料庫（若雲端權限未開啟，保留本機套用結果）
     let count = 0;
-    for (let r of records) {
-      await supabaseInstance.from('site_mappings').upsert({
-        electric_number: r.electric_number,
-        site_name: r.site_name,
-        updated_at: new Date().toISOString()
-      });
+    try {
+      for (let r of records) {
+        await supabaseInstance.from('site_mappings').upsert({
+          electric_number: r.electric_number,
+          site_name: r.site_name,
+          updated_at: new Date().toISOString()
+        });
 
-      const { error } = await supabaseInstance.from('electricity_bills')
-        .update({ site_name: r.site_name, updated_at: new Date().toISOString() })
-        .eq('electric_number', r.electric_number);
+        const { error } = await supabaseInstance.from('electricity_bills')
+          .update({ site_name: r.site_name, updated_at: new Date().toISOString() })
+          .eq('electric_number', r.electric_number);
 
-      if (!error) count++;
+        if (!error) count++;
+      }
+    } catch (e) {
+      console.warn('Dispatch cloud sync note:', e.message);
     }
 
     return { 
       success: true, 
       count: records.length, 
-      message: `成功同步更新 Supabase 雲端資料庫中 ${records.length} 組案場名稱對照！` 
+      message: count > 0
+        ? `成功同步更新 Supabase 雲端資料庫中 ${count} 組案場名稱對照！`
+        : `已於本機套用 ${records.length} 組案場名稱對照（共更新 ${updated} 筆本機帳單）！`
     };
   },
 
@@ -727,17 +734,43 @@ const SupabaseBillService = {
     return { success: true, syncedCount };
   },
 
-  // 更新特定電費單資料（支援線上預覽核對時直接修改保存）
+  // 更新特定電費單資料（支援線上預覽核對時直接修改保存，雲端無權限時自動儲存至本機）
   async updateBill(id, fields) {
     BillAuth.requireUser();
     if (!id) throw new Error('找不到電費單。');
-    const {data: previous,error: readError} = await supabaseInstance.from('electricity_bills').select('*').eq('id',id).single();
-    if (readError) throw readError;
-    const validated = validateBillRecognition({...previous,...fields});
-    const payload = {...fields,status:validated.status === 'PARSED' ? 'MANUAL_EDITED' : 'NEEDS_REVIEW',parse_warnings:validated.parse_warnings,updated_at:new Date().toISOString()};
-    const {data,error} = await supabaseInstance.from('electricity_bills').update(payload).eq('id',id).select('id').single();
-    if (error || !data) throw new Error('雲端儲存失敗：' + (error?.message || '沒有更新任何帳單'));
-    this.saveLocalBill({...previous,...payload});
+
+    const seedList = (typeof window !== 'undefined' && (window.AUDITED_BILLS_REGISTRY || window.DEFAULT_SEED_BILLS)) || [];
+    const localList = this.getLocalBills();
+    let previous = localList.find(b => b.id == id) || seedList.find(b => b.id == id) || null;
+    let cloudAvailable = false;
+
+    if (this.isConfigured() && supabaseInstance) {
+      try {
+        const { data: cloudRow, error: readError } = await supabaseInstance.from('electricity_bills').select('*').eq('id', id).single();
+        if (!readError && cloudRow) {
+          previous = cloudRow;
+          cloudAvailable = true;
+        }
+      } catch (e) {}
+    }
+
+    if (!previous) throw new Error('找不到指定電費單資料。');
+
+    const validated = validateBillRecognition({ ...previous, ...fields });
+    const payload = { ...fields, status: validated.status === 'PARSED' ? 'MANUAL_EDITED' : 'NEEDS_REVIEW', parse_warnings: validated.parse_warnings, updated_at: new Date().toISOString() };
+
+    if (cloudAvailable && supabaseInstance) {
+      try {
+        const { data, error } = await supabaseInstance.from('electricity_bills').update(payload).eq('id', id).select('id').single();
+        if (!error && data) {
+          this.saveLocalBill({ ...previous, ...payload, synced_to_cloud: true });
+          return { synced: true };
+        }
+      } catch (e) {}
+    }
+
+    this.saveLocalBill({ ...previous, ...payload, synced_to_cloud: false });
+    return { synced: false };
   },
 
   // 產生一鍵分享連結（附帶已設定之 Supabase 憑證，供團隊無痛連線）

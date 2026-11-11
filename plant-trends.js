@@ -1,37 +1,55 @@
 /* Interactive trend workspace backed by the complete authenticated bill history. */
 const PlantTrends = {
- data:null,model:null,serial:0,lastPlant:null,loadedAt:null,
+ data:null,model:null,serial:0,lastPlant:null,loadedAt:null,sourceNote:null,
  fields:'id,filename,file_hash,electric_number,site_name,bill_type,billing_start_ad,billing_end_ad,bill_year_month_ad,installed_capacity_kw,total_kwh,purchase_amount,net_payable_amount,machines_json,status,updated_at',
  el(id){return document.getElementById(id);},
  h(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
  fmt(value,digits=0){return value===null||value===undefined||!Number.isFinite(Number(value))?'—':Number(value).toLocaleString('zh-TW',{minimumFractionDigits:digits,maximumFractionDigits:digits});},
  clear(){this.model=null;for(const id of ['trendMetrics','trendQuality','trendPeriod','trendEnergyChart','trendRevenueChart','trendYieldChart','trendYearRows','trendBillRows','trendIssues','trendScenarioResult'])this.el(id)?.replaceChildren();if(this.el('trendExport'))this.el('trendExport').disabled=true;},
- reset(){this.serial++;this.data=null;this.lastPlant=null;this.clear();this.el('trendPlant')?.replaceChildren();if(this.el('trendStatus'))this.el('trendStatus').textContent='請登入後載入資料。';},
+ reset(){this.serial++;this.data=null;this.lastPlant=null;this.sourceNote=null;this.clear();this.el('trendPlant')?.replaceChildren();if(this.el('trendStatus'))this.el('trendStatus').textContent='請登入後載入資料。';},
  invalidate(){this.data=null;if(this.el('trendsView')&&!this.el('trendsView').classList.contains('hidden'))this.load(true);},
  async load(force=false){
   BillAuth.requireUser();
   if(this.data&&!force){this.render();return;}
   const ticket=++this.serial;this.el('trendStatus').textContent='正在讀取所有案場的完整帳單歷史…';this.el('trendRefresh').disabled=true;this.el('trendExport').disabled=true;
   try{
-   const client=SupabaseBillService.getClient(),rows=[];let offset=0;
-   while(true){
-    const {data,count,error}=await client.from('electricity_bills').select(this.fields,{count:'exact'}).order('id',{ascending:true}).range(offset,offset+499);
-    if(error)throw error;
+   const client=SupabaseBillService.getClient();
+   let rows=[],cloudError=null,sourceNote=null;
+   if(client){
+    try{
+     let offset=0;
+     while(true){
+      const {data,count,error}=await client.from('electricity_bills').select(this.fields,{count:'exact'}).order('id',{ascending:true}).range(offset,offset+499);
+      if(error)throw error;
+      if(ticket!==this.serial||!BillAuth.profile?.active)return;
+      rows.push(...(data||[]));offset+=(data||[]).length;
+      if(count!==null&&offset>=count)break;
+      if(!data?.length){if(count!==null&&offset<count)throw new Error('帳單讀取未完成，請重試。');break;}
+      if(count===null&&data.length<500)break;
+     }
+    }catch(err){
+     cloudError=err;
+     rows=[];
+    }
+   }
+   if(!rows.length){
+    const fallback=await SupabaseBillService.fetchBills({sortBy:'id',order:'asc'});
     if(ticket!==this.serial||!BillAuth.profile?.active)return;
-    rows.push(...(data||[]));offset+=(data||[]).length;
-    if(count!==null&&offset>=count)break;
-    if(!data?.length){if(count!==null&&offset<count)throw new Error('帳單讀取未完成，請重試。');break;}
-    if(count===null&&data.length<500)break;
+    rows=(fallback?.bills||[]).map(b=>({...b,machines_json:b.machines_json??b.machines??[]}));
+    if(!rows.length&&cloudError)throw cloudError;
+    sourceNote=cloudError?'離線稽核標準庫＋本機資料（雲端權限未授權）':'離線稽核標準庫＋本機資料';
    }
    if(ticket!==this.serial||!BillAuth.profile?.active)return;
-   this.data=rows;this.loadedAt=new Date().toLocaleString('zh-TW',{timeZone:'Asia/Taipei'});
+   this.data=rows;this.sourceNote=sourceNote;this.loadedAt=new Date().toLocaleString('zh-TW',{timeZone:'Asia/Taipei'});
    const select=this.el('trendPlant'),old=select.value,plants=SolarTrends.plants(rows);select.replaceChildren();
    for(const plant of plants){const option=document.createElement('option');option.value=plant.id;option.textContent=plant.name+'｜'+plant.id+'（'+plant.count+' 期）';select.append(option);}
-   if(plants.some(p=>p.id===old))select.value=old;else if(plants.length)select.value=[...plants].sort((a,b)=>b.count-a.count)[0].id;
+   if(!plants.length){const emptyOpt=document.createElement('option');emptyOpt.value='';emptyOpt.textContent='尚無案場資料';select.append(emptyOpt);}
+   else if(plants.some(p=>p.id===old))select.value=old;
+   else select.value=[...plants].sort((a,b)=>b.count-a.count)[0].id;
    this.selectPlant();
   }catch(error){
    if(ticket!==this.serial)return;
-   this.data=null;this.clear();this.el('trendStatus').textContent='資料讀取失敗：'+error.message+'。請重新整理；未以舊資料或零值代替。';
+   this.data=null;this.sourceNote=null;this.clear();this.el('trendStatus').textContent='資料讀取失敗：'+error.message+'。請重新整理；未以舊資料或零值代替。';
   }finally{if(ticket===this.serial)this.el('trendRefresh').disabled=false;}
  },
  selectPlant(){this.lastPlant=null;this.render();},
@@ -41,7 +59,8 @@ const PlantTrends = {
   const model=SolarTrends.analyze(this.data,electric,{revenueField});this.model=model;
   const title=revenueField==='net_payable_amount'?'含稅應付淨額':'未稅售電收入';
   this.el('trendRevenueTitle').textContent=title;this.el('trendYearRevenueHeader').textContent=title+' NT$';
-  this.el('trendStatus').textContent='已載入完整歷史 '+this.data.length+' 筆｜本案有效 '+model.periods.length+' 期｜更新：'+this.loadedAt+'（台灣時間）';
+  const srcLabel=this.sourceNote||'雲端完整歷史';
+  this.el('trendStatus').textContent='已載入'+srcLabel+' '+this.data.length+' 筆｜本案有效 '+model.periods.length+' 期｜更新：'+this.loadedAt+'（台灣時間）';
   this.el('trendPeriod').textContent=model.start?'可追溯計費期間 '+model.start+' 至 '+model.end+'｜有效 '+model.coveredDays+' 天／期間共 '+model.spanDays+' 天｜距今日 '+model.lagDays+' 天尚無後續帳單資料':'此案場尚無可納入的計費期間。';
   const card=(name,value,sub)=>'<article class="trend-metric"><p class="trend-metric-label">'+name+'</p><p class="trend-metric-value">'+value+'</p><p class="trend-metric-sub">'+sub+'</p></article>';
   this.el('trendMetrics').innerHTML=[
@@ -99,7 +118,7 @@ const PlantTrends = {
   svg+='<text x="'+left+'" y="'+(height-8)+'" fill="#778a9b" font-size="11">滑鼠停留或鍵盤選取資料點可讀取數值'+(this.el('trendGrain').value==='year'?'；空心點為未完整年度。':'；依實際計費期顯示，期長可能不同。')+'</text></svg>';
   container.innerHTML=svg;
  },
- async preview(index){try{BillAuth.requireUser();const bill=this.model.periods[index]?.row;if(!bill)return;const url=await SupabaseBillService.getBillFileUrl(bill);window.open(url,'_blank','noopener,noreferrer');}catch(error){showToast('無法開啟帳單：'+error.message,true);}},
+ async preview(index){try{BillAuth.requireUser();const bill=this.model.periods[index]?.row;if(!bill)return;const url=await SupabaseBillService.getBillFileUrl(bill);if(!url)throw new Error('此筆為離線稽核紀錄，目前未附加原始 PDF 檔案。');window.open(url,'_blank','noopener,noreferrer');}catch(error){showToast('無法開啟帳單：'+error.message,true);}},
  exportExcel(){
   try{
    BillAuth.requireUser();const m=this.model;if(!m||!window.XLSX)throw new Error('分析資料或匯出元件尚未載入。');
