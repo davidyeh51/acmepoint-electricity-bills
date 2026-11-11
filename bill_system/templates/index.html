@@ -48,14 +48,14 @@
     <!-- Supabase Client Module -->
     <!-- Audited Bills Standard Database Module -->
     <script src="audited-bills-data.js?v=20261111.2"></script>
-    <script src="supabase-client.js?v=20261111.2"></script>
+    <script src="supabase-client.js?v=20261111.3"></script>
     <script src="auth.js?v=20261030.2"></script>
     <script src="trends-core.js?v=20261030.2"></script>
     <script src="plant-trends.js?v=20261111.1"></script>
     <link rel="stylesheet" href="trends.css?v=20261030.2">
     <script src="bill-recognition.js?v=20261111.2"></script>
     <script src="spv-finance-data.js?v=20261111.1"></script>
-    <script src="spv-finance.js?v=20261111.1"></script>
+    <script src="spv-finance.js?v=20261111.2"></script>
     <style>
         [hidden] { display: none !important; }
         html:not(.authenticated) body > :not(#authGate):not(script):not(style) { display: none !important; }
@@ -183,7 +183,7 @@
                 </button>
                 <button id="navTabTrends" onclick="switchMainView('trends')" class="inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-white text-slate-700 hover:bg-slate-50 border border-slate-200"><i data-lucide="chart-no-axes-combined" class="w-4 h-4 text-brand-600"></i><span>案場發電與收益趨勢</span></button>
                 <button id="navTabSpv" onclick="switchMainView('spv')" class="inline-flex items-center space-x-2 px-4 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition shadow-sm bg-white text-slate-700 hover:bg-slate-50 border border-slate-200">
-                    <i data-lucide="landmark" class="w-4 h-4 text-indigo-600"></i>
+                    <i data-lucide="landmark" class="w-4 h-4"></i>
                     <span>建坤 SPV 電廠財務追蹤</span>
                     <span class="px-2 py-0.5 text-[10px] font-bold bg-indigo-100 text-indigo-800 rounded-full">CCK001 高振實業</span>
                 </button>
@@ -1658,7 +1658,6 @@
         // Load Data (KPIs + Filters + Table)
         async function loadAllData() {
             if (typeof PlantTrends !== 'undefined') PlantTrends.invalidate();
-            if (typeof SpvFinance !== 'undefined') await SpvFinance.load(true);
             await fetchKPIs();
             await fetchFilterOptions();
             await renderBillsTable();
@@ -1667,6 +1666,9 @@
             }
             if (typeof refreshMapAndYieldAnalytics === 'function') {
                 refreshMapAndYieldAnalytics();
+            }
+            if (typeof SpvFinance !== 'undefined') {
+                await SpvFinance.load(true);
             }
         }
 

@@ -793,8 +793,9 @@ const SupabaseBillService = {
     let monthly = fallbackMonthly;
     let source = 'fallback';
 
-    this.init();
-    if (cloudAvailable && supabaseInstance && typeof BillAuth !== 'undefined' && BillAuth.user) {
+    if (!supabaseInstance) this.init();
+    const hasCloudSession = this.isConfigured() && supabaseInstance && typeof BillAuth !== 'undefined' && BillAuth.user && BillAuth.user.id !== 'team-guest';
+    if (hasCloudSession) {
       try {
         const [{ data: mData, error: mErr }, { data: rData, error: rErr }] = await Promise.all([
           supabaseInstance.from('spv_plant_models').select('*').eq('spv_code', spvCode).order('plant_code', { ascending: true }),
@@ -837,28 +838,33 @@ const SupabaseBillService = {
       localStorage.setItem('SPV_PLANT_OVERRIDES_V1', JSON.stringify(overrides));
     } catch (e) {}
 
-    this.init();
-    if (cloudAvailable && supabaseInstance && typeof BillAuth !== 'undefined' && BillAuth.user) {
-      const payload = {
-        target_daily_yield: Number(modelPatch.target_daily_yield),
-        fit_rate: Number(modelPatch.fit_rate),
-        ppa_share: Number(modelPatch.ppa_share || 0),
-        ppa_rate: Number(modelPatch.ppa_rate || 0),
-        annual_degradation_rate: Number(modelPatch.annual_degradation_rate || 0.004),
-        assumptions_json: modelPatch.assumptions_json || {},
-        notes: modelPatch.notes || ''
-      };
-      const { data, error } = await supabaseInstance
-        .from('spv_plant_models')
-        .update(payload)
-        .eq('electric_number', electricNumber)
-        .select('*')
-        .single();
-      if (!error && data) {
-        return { synced: true, data };
-      }
-      if (error) {
-        console.warn('SPV plant model cloud update failed, kept locally:', error.message);
+    if (!supabaseInstance) this.init();
+    const hasCloudSession = this.isConfigured() && supabaseInstance && typeof BillAuth !== 'undefined' && BillAuth.user && BillAuth.user.id !== 'team-guest';
+    if (hasCloudSession) {
+      try {
+        const payload = {
+          target_daily_yield: Number(modelPatch.target_daily_yield),
+          fit_rate: Number(modelPatch.fit_rate),
+          ppa_share: Number(modelPatch.ppa_share || 0),
+          ppa_rate: Number(modelPatch.ppa_rate || 0),
+          annual_degradation_rate: Number(modelPatch.annual_degradation_rate || 0.004),
+          assumptions_json: modelPatch.assumptions_json || {},
+          notes: modelPatch.notes || ''
+        };
+        const { data, error } = await supabaseInstance
+          .from('spv_plant_models')
+          .update(payload)
+          .eq('electric_number', electricNumber)
+          .select('*')
+          .single();
+        if (!error && data) {
+          return { synced: true, data };
+        }
+        if (error) {
+          console.warn('SPV plant model cloud update failed, kept locally:', error.message);
+        }
+      } catch (e) {
+        console.warn('SPV plant model cloud update exception, kept locally:', e.message);
       }
     }
     return { synced: false, data: modelPatch };
@@ -873,44 +879,49 @@ const SupabaseBillService = {
       localStorage.setItem('SPV_MONTHLY_OVERRIDES_V1', JSON.stringify(overrides));
     } catch (e) {}
 
-    this.init();
-    if (cloudAvailable && supabaseInstance && typeof BillAuth !== 'undefined' && BillAuth.user) {
-      const numOrNull = (val, intMode = false) => {
-        if (val === null || val === undefined || val === '') return null;
-        const n = Number(val);
-        return Number.isFinite(n) ? (intMode ? Math.round(n) : n) : null;
-      };
-      const payload = {
-        plant_model_id: rowPatch.plant_model_id,
-        electric_number: rowPatch.electric_number,
-        tracking_year_month: rowPatch.tracking_year_month,
-        period_start: rowPatch.period_start,
-        period_end: rowPatch.period_end,
-        days: Number(rowPatch.days),
-        monthly_share_pct: Number(rowPatch.monthly_share_pct),
-        predicted_kwh: Math.round(Number(rowPatch.predicted_kwh)),
-        report_actual_kwh: numOrNull(rowPatch.report_actual_kwh, true),
-        taipower_billed_kwh: numOrNull(rowPatch.taipower_billed_kwh, true),
-        taipower_bill_months: rowPatch.taipower_bill_months || null,
-        bill_purchase_amount: numOrNull(rowPatch.bill_purchase_amount, false),
-        bill_settlement_amount: numOrNull(rowPatch.bill_settlement_amount, false),
-        bill_tax_amount: numOrNull(rowPatch.bill_tax_amount, false),
-        bill_meter_rental_amount: numOrNull(rowPatch.bill_meter_rental_amount, false),
-        bill_net_payable_amount: numOrNull(rowPatch.bill_net_payable_amount, false),
-        opex_actual_override: numOrNull(rowPatch.opex_actual_override, false),
-        remark: rowPatch.remark || null,
-        source: rowPatch.source || 'MANUAL_UPDATE'
-      };
-      const { data, error } = await supabaseInstance
-        .from('spv_monthly_tracking')
-        .upsert(payload, { onConflict: 'plant_model_id,tracking_year_month' })
-        .select('*')
-        .single();
-      if (!error && data) {
-        return { synced: true, data };
-      }
-      if (error) {
-        console.warn('SPV monthly tracking cloud upsert failed, kept locally:', error.message);
+    if (!supabaseInstance) this.init();
+    const hasCloudSession = this.isConfigured() && supabaseInstance && typeof BillAuth !== 'undefined' && BillAuth.user && BillAuth.user.id !== 'team-guest';
+    if (hasCloudSession) {
+      try {
+        const numOrNull = (val, intMode = false) => {
+          if (val === null || val === undefined || val === '') return null;
+          const n = Number(val);
+          return Number.isFinite(n) ? (intMode ? Math.round(n) : n) : null;
+        };
+        const payload = {
+          plant_model_id: rowPatch.plant_model_id,
+          electric_number: rowPatch.electric_number,
+          tracking_year_month: rowPatch.tracking_year_month,
+          period_start: rowPatch.period_start,
+          period_end: rowPatch.period_end,
+          days: Number(rowPatch.days),
+          monthly_share_pct: Number(rowPatch.monthly_share_pct),
+          predicted_kwh: Math.round(Number(rowPatch.predicted_kwh)),
+          report_actual_kwh: numOrNull(rowPatch.report_actual_kwh, true),
+          taipower_billed_kwh: numOrNull(rowPatch.taipower_billed_kwh, true),
+          taipower_bill_months: rowPatch.taipower_bill_months || null,
+          bill_purchase_amount: numOrNull(rowPatch.bill_purchase_amount, false),
+          bill_settlement_amount: numOrNull(rowPatch.bill_settlement_amount, false),
+          bill_tax_amount: numOrNull(rowPatch.bill_tax_amount, false),
+          bill_meter_rental_amount: numOrNull(rowPatch.bill_meter_rental_amount, false),
+          bill_net_payable_amount: numOrNull(rowPatch.bill_net_payable_amount, false),
+          opex_actual_override: numOrNull(rowPatch.opex_actual_override, false),
+          remark: rowPatch.remark || null,
+          source: rowPatch.source || 'MANUAL_UPDATE'
+        };
+        const { data, error } = await supabaseInstance
+          .from('spv_monthly_tracking')
+          .upsert(payload, { onConflict: 'plant_model_id,tracking_year_month' })
+          .select('*')
+          .single();
+        if (!error && data) {
+          return { synced: true, data };
+        }
+        if (error) {
+          console.warn('SPV monthly tracking cloud upsert failed, kept locally:', error.message);
+        }
+      } catch (e) {
+        console.warn('SPV monthly tracking cloud upsert exception, kept locally:', e.message);
       }
     }
     return { synced: false, data: rowPatch };

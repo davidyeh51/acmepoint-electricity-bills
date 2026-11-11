@@ -167,3 +167,93 @@ test('SpvFinance.render renders full CCK001 dashboard into spvFinanceRoot withou
   assert.ok(rootEl.innerHTML.includes('831,077'));
   assert.ok(rootEl.innerHTML.includes('3,249,422'));
 });
+
+test('SpvFinance.load + SupabaseBillService.fetchSpvData/saveSpvPlantModel work under guest and cloud modes without ReferenceError', async () => {
+  const rootEl = { innerHTML: '', classList: { add() {}, remove() {} } };
+  const storage = new Map();
+  const mockSupabaseClient = {
+    from(table) {
+      const builder = {
+        select() { return builder; },
+        order() { return builder; },
+        eq() { return builder; },
+        update() { return builder; },
+        upsert() { return builder; },
+        limit() { return builder; },
+        single() { return Promise.resolve({ data: null, error: { message: 'permission denied' } }); },
+        maybeSingle() { return Promise.resolve({ data: null, error: { message: 'permission denied' } }); },
+        then(resolve) {
+          if (table === 'spv_plant_models' && ctx.BillAuth.user.id !== 'team-guest') {
+            return Promise.resolve({ data: ctx.SPV_DEFAULT_MODELS, error: null }).then(resolve);
+          }
+          if (table === 'spv_monthly_tracking' && ctx.BillAuth.user.id !== 'team-guest') {
+            return Promise.resolve({ data: ctx.SPV_DEFAULT_MONTHLY_RECORDS, error: null }).then(resolve);
+          }
+          return Promise.resolve({ data: null, count: null, error: { message: 'permission denied' } }).then(resolve);
+        }
+      };
+      return builder;
+    }
+  };
+
+  const ctx = {
+    console,
+    Date,
+    Math,
+    Intl,
+    URLSearchParams,
+    setTimeout,
+    indexedDB: null,
+    lucide: { createIcons() {} },
+    BillAuth: { user: { id: 'team-guest' }, profile: { username: '團隊成員' }, requireUser() {} },
+    localStorage: {
+      getItem: (k) => (storage.has(k) ? storage.get(k) : null),
+      setItem: (k, v) => storage.set(k, String(v)),
+      removeItem: (k) => storage.delete(k)
+    },
+    location: { hash: '', search: '', origin: 'https://example.test', pathname: '/', href: 'https://example.test/' },
+    history: { replaceState() {} },
+    document: { title: 'Test', getElementById: (id) => (id === 'spvFinanceRoot' ? rootEl : null) },
+    supabase: { createClient: () => mockSupabaseClient },
+    window: null,
+    globalThis: null
+  };
+  ctx.window = ctx;
+  ctx.globalThis = ctx;
+  vm.createContext(ctx);
+
+  for (const file of ['audited-bills-data.js', 'supabase-client.js', 'spv-finance-data.js', 'spv-finance.js']) {
+    let code = fs.readFileSync(path.join(root, file), 'utf8');
+    if (file === 'supabase-client.js') code += '\n;globalThis.SupabaseBillService = SupabaseBillService;';
+    vm.runInContext(code, ctx);
+  }
+
+  // 1. Guest mode load renders complete SPV dashboard instead of stuck loading banner
+  await ctx.SpvFinance.load(true);
+  assert.ok(!rootEl.innerHTML.includes('正在載入建坤 SPV 財務追蹤資料'));
+  assert.ok(rootEl.innerHTML.includes('CCK001 高振實業'));
+  assert.ok(rootEl.innerHTML.includes('3,249,422'));
+  assert.equal(ctx.SpvFinance.state.source, 'fallback');
+
+  // 2. Guest mode local save & reload persistence (no cloudAvailable ReferenceError)
+  const saveRes = await ctx.SupabaseBillService.saveSpvPlantModel({
+    ...ctx.SPV_DEFAULT_MODELS[0],
+    assumptions_json: { ...ctx.SPV_DEFAULT_MODELS[0].assumptions_json, unit_capex_untaxed: 42000 }
+  });
+  assert.equal(saveRes.synced, false);
+
+  const rowRes = await ctx.SupabaseBillService.upsertSpvMonthlyRow({
+    ...ctx.SPV_DEFAULT_MONTHLY_RECORDS[5],
+    report_actual_kwh: 141000
+  });
+  assert.equal(rowRes.synced, false);
+
+  await ctx.SpvFinance.load(true);
+  assert.equal(ctx.SpvFinance.getActiveModel().assumptions_json.unit_capex_untaxed, 42000);
+
+  // 3. Authenticated real user loads directly from Supabase cloud tables
+  ctx.BillAuth.user = { id: 'real-auth-uuid', email: 'david@acmepoint.internal' };
+  await ctx.SpvFinance.load(true);
+  assert.equal(ctx.SpvFinance.state.source, 'cloud');
+  assert.ok(rootEl.innerHTML.includes('Supabase 雲端即時同步'));
+});

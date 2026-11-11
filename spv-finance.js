@@ -604,39 +604,83 @@
       source: 'fallback',
       models: [],
       monthly: [],
+      bills: [],
       activeElectricNumber: '11-71-0067-91-9',
       draftAssumptions: null,
       draftTopFields: null,
       editingMonthKey: null
     },
 
+    getResolvedBills() {
+      if (Array.isArray(this.state.bills) && this.state.bills.length > 0) {
+        return this.state.bills;
+      }
+      if (typeof currentBills !== 'undefined' && Array.isArray(currentBills) && currentBills.length > 0) {
+        return currentBills;
+      }
+      if (typeof window !== 'undefined' && Array.isArray(window.AUDITED_BILLS_REGISTRY)) {
+        return window.AUDITED_BILLS_REGISTRY;
+      }
+      return [];
+    },
+
+    seedDefaultFallback() {
+      const defaultModels = (typeof window !== 'undefined' && Array.isArray(window.SPV_DEFAULT_MODELS))
+        ? window.SPV_DEFAULT_MODELS
+        : [];
+      const defaultMonthly = (typeof window !== 'undefined' && Array.isArray(window.SPV_DEFAULT_MONTHLY_RECORDS))
+        ? window.SPV_DEFAULT_MONTHLY_RECORDS
+        : [];
+      if (!this.state.models.length && defaultModels.length) {
+        this.state.models = JSON.parse(JSON.stringify(defaultModels));
+      }
+      if (!this.state.monthly.length && defaultMonthly.length) {
+        this.state.monthly = JSON.parse(JSON.stringify(defaultMonthly));
+      }
+      if (this.state.models.length && !this.state.models.some(m => m.electric_number === this.state.activeElectricNumber)) {
+        this.state.activeElectricNumber = this.state.models[0].electric_number;
+      }
+      if (!this.state.draftAssumptions || !this.state.draftTopFields) {
+        this.resetDraftFromActive();
+      }
+    },
+
     async load(force = false) {
       if (this.state.loading) return;
-      if (this.state.loaded && !force) {
+      if (this.state.loaded && !force && this.state.models.length > 0) {
         this.render();
         return;
       }
       this.state.loading = true;
       try {
         let res = { models: [], monthly: [], source: 'fallback' };
-        if (typeof SupabaseBillService !== 'undefined' && typeof SupabaseBillService.fetchSpvData === 'function') {
-          res = await SupabaseBillService.fetchSpvData('CK-SPV');
-        } else if (typeof window !== 'undefined' && Array.isArray(window.SPV_DEFAULT_MODELS)) {
-          res = {
-            models: JSON.parse(JSON.stringify(window.SPV_DEFAULT_MODELS)),
-            monthly: JSON.parse(JSON.stringify(window.SPV_DEFAULT_MONTHLY_RECORDS || []))
-          };
+        let billsList = this.getResolvedBills();
+        if (typeof SupabaseBillService !== 'undefined') {
+          if (typeof SupabaseBillService.fetchSpvData === 'function') {
+            res = await SupabaseBillService.fetchSpvData('CK-SPV');
+          }
+          if (typeof SupabaseBillService.fetchBills === 'function') {
+            try {
+              const allRes = await SupabaseBillService.fetchBills({});
+              if (allRes && Array.isArray(allRes.bills) && allRes.bills.length > 0) {
+                billsList = allRes.bills;
+              }
+            } catch (billErr) {
+              console.warn('SpvFinance bill preload fallback:', billErr);
+            }
+          }
         }
-        this.state.models = res.models || [];
-        this.state.monthly = res.monthly || [];
-        this.state.source = res.source || 'fallback';
-        if (this.state.models.length && !this.state.models.some(m => m.electric_number === this.state.activeElectricNumber)) {
-          this.state.activeElectricNumber = this.state.models[0].electric_number;
-        }
+        this.state.bills = billsList || [];
+        this.state.models = (res && Array.isArray(res.models)) ? res.models : [];
+        this.state.monthly = (res && Array.isArray(res.monthly)) ? res.monthly : [];
+        this.state.source = (res && res.source) || 'fallback';
+        this.seedDefaultFallback();
         this.resetDraftFromActive();
         this.state.loaded = true;
       } catch (e) {
-        console.warn('SpvFinance.load failed:', e);
+        console.warn('SpvFinance.load failed, using audited defaults:', e);
+        this.state.source = 'fallback';
+        this.seedDefaultFallback();
       } finally {
         this.state.loading = false;
         this.render();
@@ -733,7 +777,7 @@
     openMonthEditModal(ym) {
       const model = this.getActiveModel();
       if (!model) return;
-      const bills = typeof currentBills !== 'undefined' ? currentBills : [];
+      const bills = this.getResolvedBills();
       const data = reconcileSpvMonthlyTracking(model, this.state.monthly, bills);
       const row = data.rows.find(r => r.tracking_year_month === ym);
       if (!row) return;
@@ -811,7 +855,7 @@
         if (typeof showToast === 'function') showToast('Excel 匯出工具尚未載入', true);
         return;
       }
-      const bills = typeof currentBills !== 'undefined' ? currentBills : [];
+      const bills = this.getResolvedBills();
       const data = reconcileSpvMonthlyTracking(model, this.state.monthly, bills);
       const { financial_model: fin, rows, linked_bills: linkedBills } = data;
 
@@ -901,16 +945,24 @@
     render() {
       const container = document.getElementById('spvFinanceRoot');
       if (!container) return;
+      if (!this.getActiveModel()) {
+        this.seedDefaultFallback();
+      }
       const model = this.getActiveModel();
       if (!model) {
         container.innerHTML = '<div class="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-500 text-sm">正在載入建坤 SPV 財務追蹤資料...</div>';
         return;
       }
 
-      const bills = typeof currentBills !== 'undefined' ? currentBills : [];
+      const bills = this.getResolvedBills();
       const data = reconcileSpvMonthlyTracking(model, this.state.monthly, bills);
       const { financial_model: fin, rows, linked_bills: linkedBills, summary: s } = data;
       const a = fin.assumptions;
+      const actualRowsList = rows.filter(r => r.effective_actual_kwh != null);
+      const actualSharePct = actualRowsList.reduce((acc, r) => acc + Number(r.monthly_share_pct || 0), 0);
+      const actualSpanText = actualRowsList.length
+        ? `${actualRowsList[0].period_start.slice(5).replace('-', '/')}–${actualRowsList[actualRowsList.length - 1].period_end.slice(5).replace('-', '/')}`
+        : '-';
 
       const syncBadge = this.state.source === 'cloud'
         ? '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>Supabase 雲端即時同步</span>'
@@ -1146,16 +1198,16 @@
               <tfoot class="bg-slate-100 border-t-2 border-slate-300 font-bold text-xs text-slate-900 font-mono">
                 <tr>
                   <td class="py-2.5 px-3 sticky left-0 bg-slate-100 z-10">已實績小計 (${s.actual_months_count}M)</td>
-                  <td class="py-2.5 px-2.5">5/11–9/30</td>
+                  <td class="py-2.5 px-2.5">${escHtml(actualSpanText)}</td>
                   <td class="py-2.5 px-2 text-center">${s.total_actual_days}</td>
-                  <td class="py-2.5 px-2 text-right">42.86%</td>
+                  <td class="py-2.5 px-2 text-right">${(actualSharePct * 100).toFixed(2)}%</td>
                   <td class="py-2.5 px-2.5 text-right">${fmtNum(s.total_predicted_to_date)}</td>
                   <td class="py-2.5 px-2.5 text-right text-emerald-700">${fmtNum(s.total_report_actual_to_date)}</td>
                   <td class="py-2.5 px-2.5 text-right ${achColor}">${fmtPct(s.overall_achievement)}</td>
                   <td class="py-2.5 px-2 text-right">${s.actual_avg_dmy != null ? s.actual_avg_dmy.toFixed(2) : '-'}</td>
                   <td class="py-2.5 px-2.5 text-right">${fmtNum(s.total_billed_kwh)}</td>
                   <td class="py-2.5 px-2 text-right text-emerald-700">${s.bill_vs_report_diff_kwh}</td>
-                  <td class="py-2.5 px-2.5 font-sans text-[11px]">5 張台電電費單</td>
+                  <td class="py-2.5 px-2.5 font-sans text-[11px]">${linkedBills.length} 張台電電費單</td>
                   <td class="py-2.5 px-2.5 text-right text-indigo-800">${fmtNum(s.total_billed_untaxed)}</td>
                   <td class="py-2.5 px-2.5 text-right text-rose-700">-${fmtNum(Math.round(s.est_opex_to_date))}</td>
                   <td class="py-2.5 px-2.5 text-right text-emerald-700">${fmtNum(Math.round(s.est_ebitda_to_date))}</td>
@@ -1306,7 +1358,7 @@
         </div>
 
         <!-- Inline Edit Month Modal -->
-        <div id="spvMonthEditModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div id="spvMonthEditModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden">
             <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
               <div>
