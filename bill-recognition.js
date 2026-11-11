@@ -9,10 +9,11 @@ const GLOBAL_KNOWN_PLANTS = {
   '19-61-0388-24-1': { site_name: '雲林水林蕃薯厝', customer_name: '中租迪和股份有限公司', contract_number: '19-PV-102-0056', tax_id: '05072925', plant_location: '雲林縣水林鄉蕃薯村蕃薯厝45之30號', city: '雲林縣', district: '水林鄉', installed_capacity_kw: 94.57, fit_rate: 7.3297, taipower_branch: '雲林區營業處' },
   '20-74-4843-02-2': { site_name: '台南下營茅港尾', customer_name: '中租迪和股份有限公司', contract_number: '20-PV-108-0186', tax_id: '05072925', plant_location: '台南市下營區茅港里茅港尾227-5號', city: '台南市', district: '下營區', installed_capacity_kw: 300.08, fit_rate: 4.4896, taipower_branch: '新營區營業處' },
   '11-63-0824-95-9': { site_name: '五甲尾', customer_name: '常利太陽能股份有限公司', contract_number: '11-PV-111-0233', tax_id: '43941328', plant_location: '高雄市岡山區嘉興段344、344-2等 (五甲尾滯洪池)', city: '高雄市', district: '岡山區', installed_capacity_kw: 4999.20, fit_rate: 4.8529, taipower_branch: '高雄區營業處' },
-  '08-40-8620-12-7': { site_name: '美傢家具鹿港廠1', customer_name: '常利太陽能股份有限公司', contract_number: '08-PV-109-0339', tax_id: '23924765', plant_location: '彰化縣鹿港鎮彰濱工業區鹿工路6號', city: '彰化縣', district: '鹿港鎮', installed_capacity_kw: 1628.90, fit_rate: 4.2444, taipower_branch: '彰化區營業處' },
+  '08-40-8620-12-7': { site_name: '美傢家具鹿港廠1', customer_name: '中租迪和股份有限公司', contract_number: '08-PV-109-0339', tax_id: '05072925', plant_location: '彰化縣鹿港鎮上林段598、599地號', city: '彰化縣', district: '鹿港鎮', installed_capacity_kw: 1628.90, fit_rate: 4.2444, taipower_branch: '彰化區營業處' },
   '10-56-4770-02-1': { site_name: '賴侯淑貞', customer_name: '賴侯淑貞', contract_number: '10-PV-106-0047', tax_id: 'Q200880199', plant_location: '彰化縣大城鄉頂莊段0453-0000地號', city: '彰化縣', district: '大城鄉', installed_capacity_kw: 196.62, fit_rate: 4.2444, taipower_branch: '彰化區營業處' },
   '10-57-1231-91-1': { site_name: '台南安南工業六路', customer_name: '中租迪和股份有限公司', contract_number: '10-PV-112-0238', tax_id: '05072925', plant_location: '台南市安南區工業六路55號', city: '台南市', district: '安南區', installed_capacity_kw: 771.75, fit_rate: 4.3153, taipower_branch: '台南區營業處' },
   '11-24-4010-95-5': { site_name: '高雄前鎮大華一路', customer_name: '中租迪和股份有限公司', contract_number: '11-PV-105-0227', tax_id: '05072925', plant_location: '高雄市前鎮區大華一路38號', city: '高雄市', district: '前鎮區', installed_capacity_kw: 438.36, fit_rate: 4.8056, taipower_branch: '高雄區營業處' },
+  '21-60-1433-90-2': { site_name: '苗栗銅鑼民治路', customer_name: '中租迪和股份有限公司', contract_number: '21-PV-109-0033', tax_id: '05072925', plant_location: '苗栗縣銅鑼鄉民治路39號', city: '苗栗縣', district: '銅鑼鄉', installed_capacity_kw: 646.695, fit_rate: 5.1415, taipower_branch: '苗栗區營業處' },
 };
 
 function getKnownPlant(electricNumber) {
@@ -222,7 +223,7 @@ function parseTaipowerBillFromText(rawText, rawLines, filename) {
   if(!bill.customer_name)bill.customer_name=(text.match(/[\u4e00-\u9fff]{2,15}(?:股份)?有限公司/g)||[]).find(x=>!x.includes('台灣電力'))||'';
   bill.tax_id=find(/統一編號\s*[:：]?\s*(\d{8})\b/);
   bill.plant_location=find(/設(?:置|定)地點\s*[:：]?\s*([^\n]+)/);
-  const city=bill.plant_location.match(/(?:台北|新北|桃園|台中|台南|高雄|基隆|新竹|嘉義)市|(?:新竹|苗栗|彰化|南投|雲林|嘉義|屏東|宜蘭|花蓮|台東|澎湖|金民|連江)縣/);
+  const city=bill.plant_location.match(/(?:台北|新北|桃園|台中|台南|高雄|基隆|新竹|嘉義)市|(?:新竹|苗栗|彰化|南投|雲林|嘉義|屏東|宜蘭|花蓮|台東|澎湖|金門|連江)縣/);
   bill.city=city?city[0]:'';
   const district=bill.city?bill.plant_location.match(new RegExp(bill.city+'([^\\d縣市、]{1,5}?[區鄉鎮市])')):null;bill.district=district?district[1]:'';
   bill.installed_capacity_kw=number('(?:併聯總)?裝置容量');

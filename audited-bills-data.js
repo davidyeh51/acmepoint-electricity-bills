@@ -1,6 +1,6 @@
 /**
  * 進金生能源 6692 - 全量稽核電費單標準資料庫 (Audited Bills Registry)
- * 供前端離線預載、秒級比對與 100% 零誤差辨識還原 (共 19 份已稽核電費單)
+ * 供前端離線預載、秒級比對與 100% 零誤差辨識還原 (共 21 份已稽核電費單)
  */
 (function(root) {
   'use strict';
@@ -825,6 +825,98 @@
         "rate": 4.6665,
         "kwh": 21143,
         "amount": 98664
+      }
+    ],
+    "status": "PARSED",
+    "bill_type": "FIT",
+    "parse_warnings": []
+  },
+  {
+    "id": 20,
+    "filename": "08-40-8620-12-7_215136_1.pdf",
+    "file_hash": "ec8824b5284be785b6ec61e4b13e893a4eb51414323d3d8fd4fb5dddafd8355d",
+    "file_size": 485219,
+    "electric_number": "08-40-8620-12-7",
+    "contract_number": "08-PV-109-0339",
+    "site_name": "美傢家具鹿港廠1",
+    "customer_name": "中租迪和股份有限公司",
+    "customer_address": "台北市內湖區瑞光路362號8樓至12樓",
+    "tax_id": "05072925",
+    "bill_year_month": "115年11月",
+    "bill_year_month_ad": "2026-11",
+    "billing_period": "115年10月01日~115年10月31日",
+    "billing_start_ad": "2026-10-01",
+    "billing_end_ad": "2026-10-31",
+    "plant_location": "彰化縣鹿港鎮上林段598、599地號",
+    "city": "彰化縣",
+    "district": "鹿港鎮",
+    "installed_capacity_kw": 1628.9,
+    "grid_capacity_kw": 1628.9,
+    "total_kwh": 199796,
+    "fit_rate": 4.2444,
+    "purchase_amount": 848014,
+    "tax_amount": 42401,
+    "total_bill_amount": 890415,
+    "meter_rental_amount": -1628,
+    "net_payable_amount": 888787,
+    "machines_json": [
+      {
+        "name": "機組1",
+        "rate": 4.2444,
+        "kwh": 60991,
+        "amount": 258870
+      },
+      {
+        "name": "機組2",
+        "rate": 4.2444,
+        "kwh": 138805,
+        "amount": 589144
+      }
+    ],
+    "status": "PARSED",
+    "bill_type": "FIT",
+    "parse_warnings": []
+  },
+  {
+    "id": 21,
+    "filename": "21-60-1433-90-2_215141_1.pdf",
+    "file_hash": "e3b7b59e8678ab49adc4e56c4ed787f019bd15105e41212b457006e0986582ac",
+    "file_size": 480229,
+    "electric_number": "21-60-1433-90-2",
+    "contract_number": "21-PV-109-0033",
+    "site_name": "苗栗銅鑼民治路",
+    "customer_name": "中租迪和股份有限公司",
+    "customer_address": "台北市內湖區瑞光路362號6樓",
+    "tax_id": "05072925",
+    "bill_year_month": "115年11月",
+    "bill_year_month_ad": "2026-11",
+    "billing_period": "115年10月01日~115年10月31日",
+    "billing_start_ad": "2026-10-01",
+    "billing_end_ad": "2026-10-31",
+    "plant_location": "苗栗縣銅鑼鄉民治路39號",
+    "city": "苗栗縣",
+    "district": "銅鑼鄉",
+    "installed_capacity_kw": 646.695,
+    "grid_capacity_kw": 646.695,
+    "total_kwh": 68398,
+    "fit_rate": 5.1415,
+    "purchase_amount": 351671,
+    "tax_amount": 17584,
+    "total_bill_amount": 369255,
+    "meter_rental_amount": -968,
+    "net_payable_amount": 368287,
+    "machines_json": [
+      {
+        "name": "機組1",
+        "rate": 5.163,
+        "kwh": 52873,
+        "amount": 272983
+      },
+      {
+        "name": "機組2",
+        "rate": 5.0685,
+        "kwh": 15525,
+        "amount": 78688
       }
     ],
     "status": "PARSED",
