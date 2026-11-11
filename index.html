@@ -49,7 +49,7 @@
     <!-- Audited Bills Standard Database Module -->
     <script src="audited-bills-data.js?v=20261111.2"></script>
     <script src="supabase-client.js?v=20261111.3"></script>
-    <script src="auth.js?v=20261030.2"></script>
+    <script src="auth.js?v=20261111.1"></script>
     <script src="trends-core.js?v=20261030.2"></script>
     <script src="plant-trends.js?v=20261111.1"></script>
     <link rel="stylesheet" href="trends.css?v=20261030.2">
@@ -84,16 +84,21 @@
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased">
-<section id="authGate" class="min-h-screen flex items-center justify-center bg-slate-100 px-4">
-  <div class="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-8 shadow-lg">
-    <p class="text-sm font-semibold text-blue-700 mb-2">進金生能源 6692</p>
-    <h1 class="text-2xl font-bold text-slate-900 mb-2">電費單管理系統</h1>
-    <p class="text-sm text-slate-500 mb-6">請使用管理者提供的帳號登入。</p>
+<section id="authGate" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4" hidden>
+  <div class="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-7 shadow-2xl">
+    <div class="flex items-start justify-between mb-2">
+      <div>
+        <p class="text-xs font-bold text-brand-700 mb-1">進金生能源 6692</p>
+        <h1 class="text-xl font-black text-slate-900">系統帳號登入</h1>
+      </div>
+      <button id="authGateCancelBtn" type="button" onclick="BillAuth.closeLoginModal()" class="text-xs font-semibold text-slate-500 hover:text-slate-800 border border-slate-200 rounded-lg px-2.5 py-1">返回系統瀏覽</button>
+    </div>
+    <p class="text-xs text-slate-500 mb-5">可使用公司 Email（例如 <span class="font-mono">davidyeh@acmepointes.com</span>）或系統帳號登入；管理者登入後可管理所有帳戶與權限。</p>
     <form onsubmit="BillAuth.login(event)" class="space-y-4">
-      <div><label for="loginUsername" class="block text-sm mb-1">帳號</label><input id="loginUsername" name="username" autocomplete="username" required class="w-full border rounded-lg px-3 py-2" autofocus></div>
-      <div><label for="loginPassword" class="block text-sm mb-1">密碼</label><input id="loginPassword" name="password" type="password" autocomplete="current-password" required class="w-full border rounded-lg px-3 py-2"></div>
-      <p id="loginMessage" role="alert" aria-live="polite" class="text-sm text-red-700 min-h-5"></p>
-      <button id="loginSubmit" type="submit" class="w-full bg-blue-700 text-white font-semibold py-2.5 rounded-lg disabled:opacity-50">登入</button>
+      <div><label for="loginUsername" class="block text-sm font-semibold text-slate-700 mb-1">Email 或帳號</label><input id="loginUsername" name="username" type="text" autocomplete="username" placeholder="name@acmepointes.com 或帳號" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" autofocus></div>
+      <div><label for="loginPassword" class="block text-sm font-semibold text-slate-700 mb-1">密碼</label><input id="loginPassword" name="password" type="password" autocomplete="current-password" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></div>
+      <p id="loginMessage" role="alert" aria-live="polite" class="text-xs font-semibold text-rose-700 min-h-4"></p>
+      <button id="loginSubmit" type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 rounded-lg disabled:opacity-50 transition">登入</button>
     </form>
   </div>
 </section>
@@ -115,11 +120,18 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-2 text-xs">
- <span id="accountLabel" class="font-semibold text-slate-600"></span>
- <button type="button" data-admin-only onclick="BillAuth.openAccounts()" class="px-3 py-2 border rounded-lg">帳號管理</button>
- <button type="button" onclick="document.getElementById('passwordModal').classList.remove('hidden')" class="px-3 py-2 border rounded-lg">修改密碼</button>
- <button type="button" onclick="BillAuth.logout()" class="px-3 py-2 border rounded-lg">登出</button>
-</div>
+                <span id="accountLabel" class="inline-flex items-center px-2.5 py-1.5 rounded-lg font-semibold bg-slate-100 text-slate-700 border border-slate-200">免配置瀏覽模式 · 未登入</span>
+                <button id="headerAccountsBtn" type="button" onclick="BillAuth.openAccounts()" class="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition shadow-sm">
+                    <i data-lucide="user-cog" class="w-3.5 h-3.5"></i>
+                    <span>帳戶管理</span>
+                </button>
+                <button id="headerLoginBtn" type="button" onclick="BillAuth.openLoginModal()" class="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition shadow-sm">
+                    <i data-lucide="log-in" class="w-3.5 h-3.5"></i>
+                    <span>登入</span>
+                </button>
+                <button id="headerPasswordBtn" type="button" onclick="document.getElementById('passwordModal').classList.remove('hidden')" class="px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 rounded-lg font-semibold text-slate-700 transition" hidden>修改密碼</button>
+                <button id="headerLogoutBtn" type="button" onclick="BillAuth.logout()" class="px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 rounded-lg font-semibold text-slate-700 transition" hidden>登出</button>
+            </div>
             <!-- Action Buttons & Supabase Status -->
             <div class="flex flex-wrap items-center gap-2">
                 <!-- Supabase Cloud Connection Indicator -->
@@ -1486,17 +1498,79 @@
  <div class="flex justify-end gap-2"><button type="button" onclick="document.getElementById('passwordModal').classList.add('hidden')" class="border rounded-lg px-4 py-2">關閉</button><button type="submit" class="bg-blue-700 text-white rounded-lg px-4 py-2">更新密碼</button></div>
  </form></div>
 </div>
-<div id="accountsModal" class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4 hidden">
- <div class="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"><div class="flex justify-between items-center mb-4"><h2 class="text-lg font-bold">帳號管理</h2><button type="button" onclick="document.getElementById('accountsModal').classList.add('hidden')" class="border rounded-lg px-3 py-1">關閉</button></div>
- <p class="text-xs text-slate-500 mb-3">管理者可管理帳號；使用者可查詢、上傳、修正及匯出電費單。</p>
- <div id="accountsList" class="text-sm mb-6"></div><h3 class="font-bold mb-3">新增帳號</h3>
- <form onsubmit="BillAuth.createAccount(event)" class="grid sm:grid-cols-2 gap-3">
- <label class="text-sm">帳號<input id="newUsername" autocomplete="off" pattern="[a-z][a-z0-9_]{2,31}" required class="block w-full border rounded-lg px-3 py-2"></label>
- <label class="text-sm">權限<select id="newRole" class="block w-full border rounded-lg px-3 py-2"><option value="user">使用者</option><option value="admin">管理者</option></select></label>
- <label class="text-sm">初始密碼<input id="accountPassword" type="password" autocomplete="new-password" minlength="8" required class="block w-full border rounded-lg px-3 py-2"></label>
- <div class="flex items-end"><button type="submit" class="bg-blue-700 text-white rounded-lg px-4 py-2">建立帳號</button></div>
- <p id="accountMessage" role="status" class="text-sm text-blue-700 sm:col-span-2"></p>
- </form></div>
+<div id="accountsModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+ <div class="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+  <div class="flex flex-wrap justify-between items-center gap-2 pb-3 mb-4 border-b border-slate-200">
+    <div>
+      <h2 class="text-lg font-black text-slate-900">帳戶與權限管理</h2>
+      <p class="text-xs text-slate-500 mt-0.5">目前身分：<span id="accountsCurrentIdentity" class="font-semibold text-slate-700"></span></p>
+    </div>
+    <button type="button" onclick="document.getElementById('accountsModal').classList.add('hidden')" class="border border-slate-200 hover:bg-slate-100 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700">關閉</button>
+  </div>
+
+  <!-- Login prompt when guest clicks Account Management -->
+  <div id="accountsLoginGate" class="hidden space-y-4">
+    <div class="p-3.5 rounded-xl bg-indigo-50 border border-indigo-200 text-xs text-indigo-950">
+      <p class="font-bold mb-1">請先使用「管理者」Email 帳號登入</p>
+      <p>為確保系統資料安全，新增 Email 帳號與設定「管理者／使用者」權限僅限已登入的管理者執行（支援公司 Email 例如 <span class="font-mono font-bold">davidyeh@acmepointes.com</span>）。</p>
+    </div>
+    <form onsubmit="BillAuth.login(event, { fromAccountsModal: true })" class="space-y-3">
+      <div>
+        <label for="accountsLoginIdentifier" class="block text-xs font-bold text-slate-700 mb-1">管理者 Email（或帳號）</label>
+        <input id="accountsLoginIdentifier" type="text" autocomplete="username" placeholder="davidyeh@acmepointes.com" required class="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label for="accountsLoginPassword" class="block text-xs font-bold text-slate-700 mb-1">密碼</label>
+        <input id="accountsLoginPassword" type="password" autocomplete="current-password" required class="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <p id="accountsLoginMessage" role="alert" class="text-xs font-semibold text-rose-700 min-h-4"></p>
+      <button id="accountsLoginSubmit" type="submit" class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow transition">管理者登入並開啟帳戶管理</button>
+    </form>
+  </div>
+
+  <!-- Notice when logged in as regular user -->
+  <div id="accountsRoleNotice" class="hidden space-y-3">
+    <div class="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+      <p id="accountsRoleNoticeText" class="font-semibold"></p>
+    </div>
+    <button type="button" onclick="document.getElementById('accountsModal').classList.add('hidden'); BillAuth.openLoginModal();" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg">切換管理者帳號</button>
+  </div>
+
+  <!-- Full Admin View: Add Email Account + Authorized Users Table -->
+  <div id="accountsManageView" class="hidden space-y-5">
+    <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
+      <div><span class="font-bold text-indigo-800">管理者 (admin)</span>：可新增 Email 帳號、指派/調整權限、停用帳號、刪除電費單及更新建坤 SPV 財模設定。</div>
+      <div><span class="font-bold text-slate-800">使用者 (user)</span>：可登入查詢、上傳、編輯與匯出電費單及 SPV 追蹤報表，無法管理帳戶或刪除資料。</div>
+    </div>
+
+    <div class="p-4 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-3">
+      <h3 class="text-sm font-black text-slate-900">新增 Email 帳號並指派權限</h3>
+      <form onsubmit="BillAuth.createAccount(event)" class="grid sm:grid-cols-2 gap-3">
+        <label class="text-xs font-bold text-slate-700">Email 帳號
+          <input id="newAccountEmail" type="text" autocomplete="off" placeholder="colleague@acmepointes.com" required class="mt-1 block w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm font-normal">
+        </label>
+        <label class="text-xs font-bold text-slate-700">帳號權限
+          <select id="newRole" class="mt-1 block w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm font-semibold">
+            <option value="user">使用者（一般操作權限）</option>
+            <option value="admin">管理者（完整權限含帳戶管理）</option>
+          </select>
+        </label>
+        <label class="text-xs font-bold text-slate-700 sm:col-span-2">初始密碼（若為尚未註冊的新 Email 必填，至少 8 字元；既有公司帳號可留空沿用原密碼）
+          <input id="accountPassword" type="password" autocomplete="new-password" minlength="8" placeholder="新帳號請輸入至少 8 碼密碼（既有帳號可留空）" class="mt-1 block w-full border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm font-normal">
+        </label>
+        <p id="accountMessage" role="status" class="text-xs font-semibold sm:col-span-2 min-h-4"></p>
+        <div class="sm:col-span-2 flex justify-end">
+          <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg px-4 py-2.5 shadow transition">建立／授權 Email 帳號</button>
+        </div>
+      </form>
+    </div>
+
+    <div>
+      <h3 class="text-sm font-black text-slate-900 mb-2">已授權系統帳戶列表</h3>
+      <div id="accountsList" class="text-sm border border-slate-200 rounded-xl px-4 divide-y divide-slate-100 bg-white"></div>
+    </div>
+  </div>
+ </div>
 </div>
     <!-- Toast Notification -->
     <div id="toast" class="fixed bottom-5 right-5 z-50 flex items-center space-x-2 px-4 py-3 rounded-xl shadow-xl bg-slate-900 text-white text-sm transform transition-all translate-y-16 opacity-0 pointer-events-none">
