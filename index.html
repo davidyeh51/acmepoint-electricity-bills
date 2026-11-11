@@ -48,14 +48,15 @@
     <!-- Supabase Client Module -->
     <!-- Audited Bills Standard Database Module -->
     <script src="audited-bills-data.js?v=20261111.2"></script>
-    <script src="supabase-client.js?v=20261111.3"></script>
+    <script src="supabase-client.js?v=20261111.4"></script>
     <script src="auth.js?v=20261111.1"></script>
     <script src="trends-core.js?v=20261030.2"></script>
     <script src="plant-trends.js?v=20261111.1"></script>
     <link rel="stylesheet" href="trends.css?v=20261030.2">
     <script src="bill-recognition.js?v=20261111.2"></script>
-    <script src="spv-finance-data.js?v=20261111.1"></script>
-    <script src="spv-finance.js?v=20261111.2"></script>
+    <script src="spv-finance-data.js?v=20261111.2"></script>
+    <script src="spv-board-charts.js?v=20261111.1"></script>
+    <script src="spv-finance.js?v=20261111.3"></script>
     <style>
         [hidden] { display: none !important; }
         html:not(.authenticated) body > :not(#authGate):not(script):not(style) { display: none !important; }
@@ -67,6 +68,14 @@
             }
             header, nav, #mainNavTabs, #billsView, #demoNoticeBanner, #calculatorView, #toast, .no-print {
                 display: none !important;
+            }
+            #spvFinanceView svg {
+                max-width: 100% !important;
+                height: auto !important;
+            }
+            #spvFinanceView .bg-white, #spvFinanceView .rounded-2xl {
+                break-inside: avoid;
+                page-break-inside: avoid;
             }
             #printInvoiceModal {
                 position: static !important;

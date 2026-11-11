@@ -774,7 +774,7 @@ const SupabaseBillService = {
   },
 
   // 產生一鍵分享連結（附帶已設定之 Supabase 憑證，供團隊無痛連線）
-  async fetchSpvData(spvCode = 'CK-SPV') {
+  async fetchSpvData(spvCode = 'ALL') {
     const fallbackModels = (typeof window !== 'undefined' && Array.isArray(window.SPV_DEFAULT_MODELS))
       ? JSON.parse(JSON.stringify(window.SPV_DEFAULT_MODELS))
       : [];
@@ -784,9 +784,13 @@ const SupabaseBillService = {
 
     let localModelOverrides = {};
     let localMonthlyOverrides = {};
+    let localCustomModels = [];
+    let localCustomMonthly = [];
     try {
       localModelOverrides = JSON.parse(localStorage.getItem('SPV_PLANT_OVERRIDES_V1') || '{}');
       localMonthlyOverrides = JSON.parse(localStorage.getItem('SPV_MONTHLY_OVERRIDES_V1') || '{}');
+      localCustomModels = JSON.parse(localStorage.getItem('SPV_CUSTOM_PLANTS_V1') || '[]');
+      localCustomMonthly = JSON.parse(localStorage.getItem('SPV_CUSTOM_MONTHLY_V1') || '[]');
     } catch (e) {}
 
     let models = fallbackModels;
@@ -797,8 +801,12 @@ const SupabaseBillService = {
     const hasCloudSession = this.isConfigured() && supabaseInstance && typeof BillAuth !== 'undefined' && BillAuth.user && BillAuth.user.id !== 'team-guest';
     if (hasCloudSession) {
       try {
+        let modelQuery = supabaseInstance.from('spv_plant_models').select('*');
+        if (spvCode && spvCode !== 'ALL') {
+          modelQuery = modelQuery.eq('spv_code', spvCode);
+        }
         const [{ data: mData, error: mErr }, { data: rData, error: rErr }] = await Promise.all([
-          supabaseInstance.from('spv_plant_models').select('*').eq('spv_code', spvCode).order('plant_code', { ascending: true }),
+          modelQuery.order('spv_code', { ascending: true }).order('plant_code', { ascending: true }),
           supabaseInstance.from('spv_monthly_tracking').select('*').order('tracking_year_month', { ascending: true })
         ]);
         if (!mErr && Array.isArray(mData) && mData.length > 0) {
@@ -812,11 +820,35 @@ const SupabaseBillService = {
     }
 
     if (source !== 'cloud') {
+      if (Array.isArray(localCustomModels) && localCustomModels.length > 0) {
+        const seenEl = new Set(models.map(m => m.electric_number));
+        localCustomModels.forEach(cm => {
+          if (cm && cm.electric_number && !seenEl.has(cm.electric_number)) {
+            models.push(cm);
+            seenEl.add(cm.electric_number);
+          }
+        });
+      }
+      if (Array.isArray(localCustomMonthly) && localCustomMonthly.length > 0) {
+        const seenRm = new Set(monthly.map(r => `${r.electric_number}::${r.tracking_year_month}`));
+        localCustomMonthly.forEach(cr => {
+          const k = `${cr.electric_number}::${cr.tracking_year_month}`;
+          if (cr && cr.electric_number && !seenRm.has(k)) {
+            monthly.push(cr);
+            seenRm.add(k);
+          }
+        });
+      }
+
       models = models.map(m => {
         const ov = localModelOverrides[m.electric_number];
-        return ov
-          ? { ...m, ...ov, assumptions_json: { ...(m.assumptions_json || {}), ...(ov.assumptions_json || {}) } }
-          : m;
+        const baseVer = m?.assumptions_json?.template_version;
+        const ovVer = ov?.assumptions_json?.template_version;
+        // Ignore stale pre-duck-v1 browser local overrides once baseline upgraded to duck-v1
+        if (!ov || (baseVer === 'duck-v1' && ovVer !== 'duck-v1')) {
+          return m;
+        }
+        return { ...m, ...ov, assumptions_json: { ...(m.assumptions_json || {}), ...(ov.assumptions_json || {}) } };
       });
       monthly = monthly.map(r => {
         const ov = localMonthlyOverrides[`${r.electric_number}::${r.tracking_year_month}`];
@@ -824,7 +856,106 @@ const SupabaseBillService = {
       });
     }
 
+    if (spvCode && spvCode !== 'ALL') {
+      models = models.filter(m => m.spv_code === spvCode);
+    }
+
     return { models, monthly, source };
+  },
+
+  async createSpvPlantModel(plantInput, monthlyRows = []) {
+    BillAuth.requireUser();
+    const electricNumber = plantInput && plantInput.electric_number;
+    if (!electricNumber) throw new Error('缺少案場電號');
+
+    try {
+      const customPlants = JSON.parse(localStorage.getItem('SPV_CUSTOM_PLANTS_V1') || '[]');
+      const nextPlants = customPlants.filter(p => p.electric_number !== electricNumber).concat([plantInput]);
+      localStorage.setItem('SPV_CUSTOM_PLANTS_V1', JSON.stringify(nextPlants));
+
+      if (Array.isArray(monthlyRows) && monthlyRows.length > 0) {
+        const customMonthly = JSON.parse(localStorage.getItem('SPV_CUSTOM_MONTHLY_V1') || '[]');
+        const nextMonthly = customMonthly
+          .filter(r => r.electric_number !== electricNumber)
+          .concat(monthlyRows);
+        localStorage.setItem('SPV_CUSTOM_MONTHLY_V1', JSON.stringify(nextMonthly));
+      }
+    } catch (e) {}
+
+    if (!supabaseInstance) this.init();
+    const hasCloudSession = this.isConfigured() && supabaseInstance && typeof BillAuth !== 'undefined' && BillAuth.user && BillAuth.user.id !== 'team-guest';
+    if (hasCloudSession) {
+      try {
+        const plantPayload = {
+          spv_code: plantInput.spv_code || 'CK-SPV',
+          spv_name: plantInput.spv_name || '建坤能源股份有限公司',
+          spv_tax_id: plantInput.spv_tax_id || '',
+          plant_code: plantInput.plant_code,
+          site_name: plantInput.site_name,
+          electric_number: electricNumber,
+          contract_number: plantInput.contract_number || '',
+          plant_location: plantInput.plant_location || '',
+          capacity_kwp: Number(plantInput.capacity_kwp),
+          cod_date: plantInput.cod_date || null,
+          tracking_start_date: plantInput.tracking_start_date || null,
+          tracking_end_date: plantInput.tracking_end_date || null,
+          target_daily_yield: Number(plantInput.target_daily_yield || 3.55),
+          annual_degradation_rate: Number(plantInput.annual_degradation_rate ?? 0.004),
+          fit_rate: Number(plantInput.fit_rate || 3.6559),
+          provisional_trial_rate: Number(plantInput.provisional_trial_rate ?? plantInput.fit_rate ?? 3.6559),
+          ppa_share: Number(plantInput.ppa_share || 0),
+          ppa_rate: Number(plantInput.ppa_rate || 0),
+          vat_rate: Number(plantInput.vat_rate ?? 0.05),
+          assumptions_json: plantInput.assumptions_json || {},
+          notes: plantInput.notes || ''
+        };
+        const { data: savedPlant, error: pErr } = await supabaseInstance
+          .from('spv_plant_models')
+          .upsert(plantPayload, { onConflict: 'electric_number' })
+          .select('*')
+          .single();
+
+        if (!pErr && savedPlant) {
+          let savedMonthly = monthlyRows;
+          if (Array.isArray(monthlyRows) && monthlyRows.length > 0) {
+            const rowsPayload = monthlyRows.map(r => ({
+              plant_model_id: savedPlant.id,
+              spv_code: savedPlant.spv_code,
+              electric_number: savedPlant.electric_number,
+              tracking_year_month: r.tracking_year_month,
+              period_start: r.period_start,
+              period_end: r.period_end,
+              days: Number(r.days),
+              monthly_share_pct: Number(r.monthly_share_pct),
+              predicted_kwh: Math.round(Number(r.predicted_kwh)),
+              report_actual_kwh: r.report_actual_kwh ?? null,
+              taipower_billed_kwh: r.taipower_billed_kwh ?? null,
+              taipower_bill_months: r.taipower_bill_months ?? null,
+              bill_purchase_amount: r.bill_purchase_amount ?? null,
+              bill_settlement_amount: r.bill_settlement_amount ?? null,
+              bill_tax_amount: r.bill_tax_amount ?? null,
+              bill_meter_rental_amount: r.bill_meter_rental_amount ?? null,
+              bill_net_payable_amount: r.bill_net_payable_amount ?? null,
+              opex_actual_override: r.opex_actual_override ?? null,
+              remark: r.remark || null,
+              source: r.source || 'TEMPLATE_AUTO'
+            }));
+            const { data: insertedRows, error: rErr } = await supabaseInstance
+              .from('spv_monthly_tracking')
+              .upsert(rowsPayload, { onConflict: 'plant_model_id,tracking_year_month' })
+              .select('*');
+            if (!rErr && Array.isArray(insertedRows) && insertedRows.length > 0) {
+              savedMonthly = insertedRows;
+            }
+          }
+          return { synced: true, model: savedPlant, monthly: savedMonthly };
+        }
+        if (pErr) console.warn('createSpvPlantModel cloud failed, kept locally:', pErr.message);
+      } catch (e) {
+        console.warn('createSpvPlantModel cloud exception, kept locally:', e.message);
+      }
+    }
+    return { synced: false, model: plantInput, monthly: monthlyRows };
   },
 
   async saveSpvPlantModel(modelPatch) {
