@@ -141,7 +141,9 @@
     if (loanYears > 0 && loanYears < baseYears.length - 1) {
       const xDebtFree = padL + slotW * (loanYears + 1);
       gridHtml += `<line x1="${xDebtFree.toFixed(1)}" y1="${padT}" x2="${xDebtFree.toFixed(1)}" y2="${padT + plotH}" stroke="#10b981" stroke-width="1" stroke-dasharray="4,3" />`;
-      gridHtml += `<text x="${(xDebtFree + 4).toFixed(1)}" y="${padT + 12}" font-size="9.5" font-weight="700" fill="#047857">Y${loanYears + 1} 貸款清償完畢</text>`;
+      const debtFreeY = Math.min(padT + plotH - 8, yCumZero + 22);
+      gridHtml += `<rect x="${(xDebtFree + 4).toFixed(1)}" y="${(debtFreeY - 11).toFixed(1)}" width="102" height="15" rx="3" fill="#ecfdf5" fill-opacity="0.95" stroke="#a7f3d0" stroke-width="0.8" />`;
+      gridHtml += `<text x="${(xDebtFree + 55).toFixed(1)}" y="${(debtFreeY - 0.5).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="700" fill="#047857">Y${loanYears + 1} 貸款清償完畢</text>`;
     }
 
     let linesHtml = '';
@@ -235,12 +237,15 @@
       gridHtml += `<text x="${padL - 6}" y="${(y + 3.5).toFixed(1)}" text-anchor="end" font-size="9.5" fill="#64748b">${fmtNum(Math.round(v))}萬</text>`;
     }
 
-    // Equity Y0 Principal Reference Line
+    // Equity Y0 Principal Reference Line (dashed line on grid; badge drawn after bars to avoid occlusion)
+    let eqBadgeHtml = '';
     if (eqY0W > 0) {
       const yEq = mapY(eqY0W);
       gridHtml += `<line x1="${padL}" y1="${yEq.toFixed(1)}" x2="${W - padR}" y2="${yEq.toFixed(1)}" stroke="#e11d48" stroke-width="1.4" stroke-dasharray="6,4" />`;
-      gridHtml += `<rect x="${padL + 6}" y="${(yEq - 17).toFixed(1)}" width="150" height="15" rx="4" fill="#fff1f2" stroke="#fda4af" />`;
-      gridHtml += `<text x="${padL + 81}" y="${(yEq - 6.5).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="700" fill="#be123c">股東自備款本金 ${fmtNum(Math.round(eqY0W))}萬</text>`;
+      const bx = padL + plotW * 0.56;
+      const by = Math.min(padT + plotH - 18, Math.max(padT + 18, yEq - 17));
+      eqBadgeHtml += `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="152" height="15" rx="4" fill="#fff1f2" fill-opacity="0.96" stroke="#fda4af" />`;
+      eqBadgeHtml += `<text x="${(bx + 76).toFixed(1)}" y="${(by + 10.5).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="700" fill="#be123c">股東自備款本金 ${fmtNum(Math.round(eqY0W))}萬</text>`;
     }
 
     const slotW = plotW / steps.length;
@@ -280,7 +285,7 @@
     gridHtml += `<text x="${W - padR}" y="16" text-anchor="end" font-size="10" font-weight="700" fill="${netGainW >= 0 ? '#047857' : '#be123c'}">扣除自備款淨回收：${netGainW >= 0 ? '+' : ''}${fmtNum(Math.round(netGainW))}萬</text>`;
 
     const label = escHtml((model && model.site_name) || '電廠');
-    return `<svg viewBox="0 0 ${W} ${H}" class="w-full h-auto select-none" role="img" aria-label="${label} 20年全生命週期現金瀑布圖">${gridHtml}${barsHtml}</svg>`;
+    return `<svg viewBox="0 0 ${W} ${H}" class="w-full h-auto select-none" role="img" aria-label="${label} 20年全生命週期現金瀑布圖">${gridHtml}${barsHtml}${eqBadgeHtml}</svg>`;
   }
 
   /**
@@ -417,15 +422,20 @@
     const yBottom = padT + items.length * rowH;
 
     // Vertical Reference Lines (Target Equity IRR & WACC/Discount Rate)
-    if (targetEquityIrr > 0) {
-      const xPlan = mapX(targetEquityIrr);
+    const xPlan = targetEquityIrr > 0 ? mapX(targetEquityIrr) : null;
+    const xDisc = discountRate > 0 ? mapX(discountRate) : null;
+    const closeLines = xPlan != null && xDisc != null && Math.abs(xPlan - xDisc) < 88;
+    if (xPlan != null) {
       svg += `<line x1="${xPlan.toFixed(1)}" y1="${padT - 4}" x2="${xPlan.toFixed(1)}" y2="${yBottom}" stroke="#4f46e5" stroke-width="1.4" stroke-dasharray="4,3" />`;
-      svg += `<text x="${xPlan.toFixed(1)}" y="${H - 10}" text-anchor="middle" font-size="9.5" font-weight="800" fill="#4f46e5">原案 ${fmtPct(targetEquityIrr, 2)}</text>`;
+      const anchor = closeLines ? (xPlan <= xDisc ? 'end' : 'start') : 'middle';
+      const dx = closeLines ? (xPlan <= xDisc ? -5 : 5) : 0;
+      svg += `<text x="${(xPlan + dx).toFixed(1)}" y="${H - 12}" text-anchor="${anchor}" font-size="9.5" font-weight="800" fill="#4f46e5">原案 ${fmtPct(targetEquityIrr, 2)}</text>`;
     }
-    if (discountRate > 0) {
-      const xDisc = mapX(discountRate);
+    if (xDisc != null) {
       svg += `<line x1="${xDisc.toFixed(1)}" y1="${padT - 4}" x2="${xDisc.toFixed(1)}" y2="${yBottom}" stroke="#d97706" stroke-width="1.2" stroke-dasharray="2,3" />`;
-      svg += `<text x="${xDisc.toFixed(1)}" y="${H - 22}" text-anchor="middle" font-size="9" font-weight="700" fill="#b45309">資金門檻 ${fmtPct(discountRate, 1)}</text>`;
+      const anchor = closeLines ? (xDisc >= xPlan ? 'start' : 'end') : 'middle';
+      const dx = closeLines ? (xDisc >= xPlan ? 5 : -5) : 0;
+      svg += `<text x="${(xDisc + dx).toFixed(1)}" y="${H - 12}" text-anchor="${anchor}" font-size="9" font-weight="700" fill="#b45309">資金門檻 ${fmtPct(discountRate, 1)}</text>`;
     }
 
     items.forEach((it, idx) => {
