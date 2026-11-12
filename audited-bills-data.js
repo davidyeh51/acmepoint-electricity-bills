@@ -1,6 +1,6 @@
 /**
  * 進金生能源 6692 - 全量稽核電費單標準資料庫 (Audited Bills Registry)
- * 供前端離線預載、秒級比對與 100% 零誤差辨識還原 (共 21 份已稽核電費單)
+ * 供前端離線預載、秒級比對與 100% 零誤差辨識還原 (共 27 份已稽核電費單)
  */
 (function(root) {
   'use strict';
@@ -1156,6 +1156,52 @@
         "rate": 3.729,
         "kwh": 189772,
         "amount": 707660
+      }
+    ],
+    "status": "PARSED",
+    "bill_type": "FIT",
+    "parse_warnings": []
+  },
+  {
+    "id": 27,
+    "filename": "10-56-4770-02-1_215241_1.pdf",
+    "file_hash": "720294118b7f13a6b82641d846cb6f82dd38382acd86e9e5b162b0e8ba2487ae",
+    "file_size": 472565,
+    "electric_number": "10-56-4770-02-1",
+    "contract_number": "10-PV-106-0047",
+    "site_name": "賴侯淑貞",
+    "customer_name": "中租迪和股份有限公司",
+    "customer_address": "台北市內湖區瑞光路362號8樓至12樓",
+    "tax_id": "05072925",
+    "bill_year_month": "115年11月",
+    "bill_year_month_ad": "2026-11",
+    "billing_period": "115年10月06日~115年11月04日",
+    "billing_start_ad": "2026-10-06",
+    "billing_end_ad": "2026-11-04",
+    "plant_location": "台南市安南區公學路五段656巷198號",
+    "city": "台南市",
+    "district": "安南區",
+    "installed_capacity_kw": 196.62,
+    "grid_capacity_kw": 196.62,
+    "total_kwh": 24784,
+    "fit_rate": 4.8111,
+    "purchase_amount": 119238,
+    "tax_amount": 5962,
+    "total_bill_amount": 125200,
+    "meter_rental_amount": -249,
+    "net_payable_amount": 124951,
+    "payment_account": "永豐商業銀行營業部99717300000067號帳戶",
+    "taipower_branch": "台南區營業處核算(收)課",
+    "taipower_tel": "(06)2160121",
+    "meter_read_last": "115年10月06日",
+    "meter_read_curr": "115年11月05日",
+    "meter_read_next": "115年12月04日",
+    "machines_json": [
+      {
+        "name": "機組1",
+        "rate": 4.8111,
+        "kwh": 24784,
+        "amount": 119238
       }
     ],
     "status": "PARSED",

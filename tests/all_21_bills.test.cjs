@@ -12,8 +12,8 @@ vm.createContext(context);
 vm.runInContext(fs.readFileSync(path.join(root, 'audited-bills-data.js'), 'utf8'), context);
 vm.runInContext(fs.readFileSync(path.join(root, 'bill-recognition.js'), 'utf8'), context);
 
-test('AUDITED_BILLS_REGISTRY has all 26 verified bills', () => {
-  assert.equal(context.AUDITED_BILLS_REGISTRY.length, 26);
+test('AUDITED_BILLS_REGISTRY has all 27 verified bills', () => {
+  assert.equal(context.AUDITED_BILLS_REGISTRY.length, 27);
 });
 
 test('Every audited bill in registry has complete and valid figures', () => {
@@ -74,4 +74,35 @@ test('CCK001 高振實業 (建坤 SPV) 5 bills match PDF totals and settlement m
   assert.ok(sepBill);
   assert.equal(sepBill.total_kwh, 189772);
   assert.equal(sepBill.net_payable_amount, 742060);
+});
+
+test('getAuditedBillMatch and getKnownPlant handle newly added bill 10-56-4770-02-1_215241_1.pdf', () => {
+  const match = context.getAuditedBillMatch('720294118b7f13a6b82641d846cb6f82dd38382acd86e9e5b162b0e8ba2487ae', '10-56-4770-02-1_215241_1.pdf');
+  assert.ok(match, 'Match 10-56-4770-02-1_215241_1.pdf failed');
+  assert.equal(match.electric_number, '10-56-4770-02-1');
+  assert.equal(match.contract_number, '10-PV-106-0047');
+  assert.equal(match.site_name, '賴侯淑貞');
+  assert.equal(match.customer_name, '中租迪和股份有限公司');
+  assert.equal(match.tax_id, '05072925');
+  assert.equal(match.bill_year_month, '115年11月');
+  assert.equal(match.bill_year_month_ad, '2026-11');
+  assert.equal(match.billing_period, '115年10月06日~115年11月04日');
+  assert.equal(match.plant_location, '台南市安南區公學路五段656巷198號');
+  assert.equal(match.city, '台南市');
+  assert.equal(match.district, '安南區');
+  assert.equal(match.installed_capacity_kw, 196.62);
+  assert.equal(match.total_kwh, 24784);
+  assert.equal(match.fit_rate, 4.8111);
+  assert.equal(match.purchase_amount, 119238);
+  assert.equal(match.tax_amount, 5962);
+  assert.equal(match.total_bill_amount, 125200);
+  assert.equal(match.meter_rental_amount, -249);
+  assert.equal(match.net_payable_amount, 124951);
+
+  const plant = context.getKnownPlant('10-56-4770-02-1');
+  assert.ok(plant);
+  assert.equal(plant.site_name, '賴侯淑貞');
+  assert.equal(plant.customer_name, '中租迪和股份有限公司');
+  assert.equal(plant.plant_location, '台南市安南區公學路五段656巷198號');
+  assert.equal(plant.fit_rate, 4.8111);
 });
